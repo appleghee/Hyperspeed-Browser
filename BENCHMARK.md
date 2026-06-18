@@ -29,11 +29,11 @@ Sites tested with Balanced profile on Windows 11, 16 GB RAM, SSD.
 
 ## Visual Chart
 
-![Benchmark Chart](https://quickchart.io/chart?bkg=rgb(22,22,40)&c={type:'bar',data:{labels:['Google','GitHub','Wikipedia'],datasets:[{label:'Load Time (ms)',data:[823,756,899],backgroundColor:'rgba(79,195,247,0.7)'},{label:'DOM Ready (ms)',data:[612,533,647],backgroundColor:'rgba(102,187,106,0.7)'}]},options:{title:{display:true,text:'Page Load Performance',color:'#e0e0e0',font:{size:16}},legend:{labels:{color:'#aaa'}},scales:{x:{ticks:{color:'#ccc'}},y:{ticks:{color:'#ccc'}}}}})
+<img src="https://quickchart.io/chart?bkg=rgb(22,22,40)&c={type:'bar',data:{labels:['Google','GitHub','Wikipedia'],datasets:[{label:'Load Time (ms)',data:[823,756,899],backgroundColor:'rgba(79,195,247,0.7)'},{label:'DOM Ready (ms)',data:[612,533,647],backgroundColor:'rgba(102,187,106,0.7)'}]},options:{title:{display:true,text:'Page Load Performance',color:'#e0e0e0',font:{size:16}},legend:{labels:{color:'#aaa'}},scales:{x:{ticks:{color:'#ccc'}},y:{ticks:{color:'#ccc'}}}}}" alt="Benchmark Chart" width="500">
 
 ## Memory Usage Over Time
 
-![Memory Chart](https://quickchart.io/chart?bkg=rgb(22,22,40)&c={type:'line',data:{labels:['0min','1min','5min','10min','30min'],datasets:[{label:'Memory (MB)',data:[8.2,10.1,11.5,12.3,12.8],borderColor:'rgba(79,195,247,1)',backgroundColor:'rgba(79,195,247,0.1)',fill:true}]},options:{title:{display:true,text:'Memory Stability',color:'#e0e0e0',font:{size:16}},legend:{labels:{color:'#aaa'}},scales:{x:{ticks:{color:'#ccc'}},y:{ticks:{color:'#ccc'}}}})
+<img src="https://quickchart.io/chart?bkg=rgb(22,22,40)&c={type:'line',data:{labels:['0min','1min','5min','10min','30min'],datasets:[{label:'Memory (MB)',data:[8.2,10.1,11.5,12.3,12.8],borderColor:'rgba(79,195,247,1)',backgroundColor:'rgba(79,195,247,0.1)',fill:true}]},options:{title:{display:true,text:'Memory Stability',color:'#e0e0e0',font:{size:16}},legend:{labels:{color:'#aaa'}},scales:{x:{ticks:{color:'#ccc'}},y:{ticks:{color:'#ccc'}}}}}" alt="Memory Chart" width="500">
 
 ## Profile Comparison
 

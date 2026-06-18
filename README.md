@@ -33,7 +33,7 @@
 | Performance score | 95/100 |
 | API response | &lt;1 ms |
 
-![benchmark-chart](https://quickchart.io/chart?c={type:'bar',data:{labels:['Google','GitHub','Wikipedia'],datasets:[{label:'Load time (ms)',data:[823,756,899],backgroundColor:'rgba(79,195,247,0.6)'}]},options:{plugins:{legend:{display:false}}}})
+<img src="https://quickchart.io/chart?c={type:'bar',data:{labels:['Google','GitHub','Wikipedia'],datasets:[{label:'Load time (ms)',data:[823,756,899],backgroundColor:'rgba(79,195,247,0.6)'}]},options:{plugins:{legend:{display:false}}}}" alt="benchmark-chart" width="400">
 
 ## Quick Start
 
