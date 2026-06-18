@@ -78,6 +78,11 @@
     '<div class="opt-stat" style="margin-top:2px"><div><b id="__mb_crg_r">-</b><s>Reused</s></div><div><b id="__mb_crg_st">-</b><s>Stale</s></div><div><b id="__mb_crg_c">-</b><s>Cached</s></div></div>' +
     '<div class="opt-act"><button class="opt-btn opt-btn-s2" id="__mb_crg_scan">\u25b6 Scan</button>' +
     '<button class="opt-btn opt-btn-s" id="__mb_crg_opt">\u267b Cache</button></div></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:5px"><div class="opt-gl">\u26a1 QuickOpt (5 features)</div>' +
+    '<div class="opt-stat"><div><b id="__mb_q_mddp">-</b><s>MDDP</s></div><div><b id="__mb_q_htp">-</b><s>HTP</s></div><div><b id="__mb_q_psfq">-</b><s>PSFQ</s></div></div>' +
+    '<div class="opt-stat" style="margin-top:2px"><div><b id="__mb_q_dae">-</b><s>DAE</s></div><div><b id="__mb_q_fdtf">-</b><s>FDTF</s></div><div><b id="__mb_q_s">-</b><s>Status</s></div></div>' +
+    '<div class="opt-act"><button class="opt-btn opt-btn-p" id="__mb_q_inj">\u25b6 Inject</button>' +
+    '<button class="opt-btn opt-btn-s" id="__mb_q_st">\u2139 Stats</button></div></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -145,7 +150,7 @@
           m.requestCount || "-";
       }
     });
-    vdScan();crgScan();
+    vdScan();crgScan();qStats();
   }
   document.getElementById("__mb_opt_m").onclick = rs;
   document.getElementById("__mb_opt_x").onclick = function () {
@@ -227,6 +232,34 @@
       if (d && d.stats) crgScan();
     });
   }
+  function qStats() {
+    api("GET", "/api/quick/stats").then(function (d) {
+      if (d && d.stats) {
+        var s = d.stats;
+        document.getElementById("__mb_q_mddp").textContent =
+          (s.mddp ? s.mddp.dnsHits + s.mddp.tcpHits : "-");
+        document.getElementById("__mb_q_htp").textContent =
+          (s.htp ? s.htp.preconnects : "-");
+        document.getElementById("__mb_q_psfq").textContent =
+          (s.psfq ? s.psfq.total : "-");
+        document.getElementById("__mb_q_dae").textContent =
+          (s.dae ? s.dae.decoded + "/" + s.dae.evicted : "-");
+        document.getElementById("__mb_q_fdtf").textContent =
+          (s.fdtf ? s.fdtf.fallbacks + "/" + s.fdtf.swapped : "-");
+        document.getElementById("__mb_q_s").textContent = "OK";
+      }
+    });
+  }
+  function qInject() {
+    api("POST", "/api/quick/inject").then(function (d) {
+      if (d && d.ok) {
+        document.getElementById("__mb_q_s").textContent = "Injected";
+        qStats();
+      }
+    });
+  }
+  document.getElementById("__mb_q_inj").onclick = qInject;
+  document.getElementById("__mb_q_st").onclick = qStats;
   document.getElementById("__mb_crg_scan").onclick = crgScan;
   document.getElementById("__mb_crg_opt").onclick = crgOpt;
   document.getElementById("__mb_vd_scan").onclick = vdScan;
@@ -234,6 +267,7 @@
   document.getElementById("__mb_script_save").onclick = saveScript;
   window.__mbRunCustomScript = runScript;
   bg("balanced");
+  qInject();
   window.__mbOptGUI = true;
 })();
 (function () {
