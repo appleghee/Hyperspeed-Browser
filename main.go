@@ -177,7 +177,7 @@ func main() {
 	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d]", app.apiPort))
 
 	// Single Init call — all JS merged
-	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;`, app.apiPort, app.apiToken) + overlayJS + toolbarJS + runtimeJS + popupBlockerJS + optimizerInitJS + optimizerGUIJS)
+	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;`, app.apiPort, app.apiToken) + overlayJS + toolbarJS + runtimeJS + popupBlockerJS + optimizerInitJS + optimizerGUIJS + lodJS)
 	w.Navigate(app.curr)
 	go app.injectTurboLoop()
 	w.Run()
@@ -402,6 +402,11 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/qse/start", b.handleQSEStart)
 	mux.HandleFunc("/api/qse/stats", b.handleQSEStats)
 	mux.HandleFunc("/api/qse/add", b.handleQSEAdd)
+
+	mux.HandleFunc("/api/lod/start", b.handleLODStart)
+	mux.HandleFunc("/api/lod/stats", b.handleLODStats)
+	mux.HandleFunc("/api/lod/toggle", b.handleLODToggle)
+	mux.HandleFunc("/api/lod", b.handleLOD)
 
 	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
