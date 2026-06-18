@@ -29,17 +29,25 @@ var optimizerGUIJS string
 
 // minimized toolbar JS (~1KB)
 const toolbarJS = `(function(){
-var h='<div id="__mb_bar" style="position:fixed;top:0;left:0;right:0;height:32px;z-index:2147483647;background:#1e1e1e;display:flex;align-items:center;padding:4px 8px;font-family:Segoe UI,sans-serif;box-shadow:0 2px 4px rgba(0,0,0,.5);box-sizing:border-box;gap:4px;border-bottom:1px solid #333"><button id="__mb_b" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;width:28px;height:24px;border-radius:3px">\u2039</button><button id="__mb_f" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;width:28px;height:24px;border-radius:3px">\u203A</button><button id="__mb_r" style="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;width:28px;height:24px;border-radius:3px">\u21bb</button><input id="__mb_u" style="flex:1;height:24px;padding:0 8px;background:#2d2d2d;border:1px solid #444;border-radius:3px;color:#ddd;font-size:13px;outline:none;min-width:0" placeholder="Nhap URL..."></div>';
-document.documentElement.insertAdjacentHTML('beforeend',h);
+var s=document.createElement('style');
+s.textContent='#__mb_bar{position:fixed;top:0;left:0;right:0;height:32px;z-index:2147483647;background:#1e1e1e;display:flex;align-items:center;padding:4px 8px;font-family:Segoe UI,sans-serif;box-shadow:0 2px 4px rgba(0,0,0,.5);box-sizing:border-box;gap:4px;border-bottom:1px solid #333;pointer-events:auto}'+
+'#__mb_bar button{background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;width:28px;height:24px;border-radius:3px}'+
+'#__mb_bar button:hover{background:rgba(255,255,255,0.1)}'+
+'#__mb_bar input{flex:1;height:24px;padding:0 8px;background:#2d2d2d;border:1px solid #444;border-radius:3px;color:#ddd;font-size:13px;outline:none;min-width:0}';
+document.head.appendChild(s);
+var d=document.createElement('div');d.id='__mb_bar';
+d.innerHTML='<button id="__mb_b">\u2039</button><button id="__mb_f">\u203A</button><button id="__mb_r">\u21bb</button><input id="__mb_u" placeholder="Nhap URL...">';
+function appendBar(){var b=document.body||document.documentElement;if(b){b.insertBefore(d,b.firstChild)}else{requestAnimationFrame(appendBar)}}
+appendBar();
 function ns(){try{return JSON.parse(window.name||'{}')}catch(e){return{}}}
 var o=new MutationObserver(function(){
 var u=document.getElementById('__mb_u'),b=document.getElementById('__mb_b'),f=document.getElementById('__mb_f'),r=document.getElementById('__mb_r');
 if(!u)return;
 o.disconnect();
-var s=ns();
+var s2=ns();
 u.onkeydown=function(e){if(e.key=='Enter'&&u.value.trim())window.goNavigate(u.value.trim())};u.value=location.href;
-if(b){b.disabled=!s.b;b.onclick=function(){window.goBack()}}
-if(f){f.disabled=!s.f;f.onclick=function(){window.goForward()}}
+if(b){b.disabled=!s2.b;b.onclick=function(){window.goBack()}}
+if(f){f.disabled=!s2.f;f.onclick=function(){window.goForward()}}
 if(r)r.onclick=function(){window.goReload()};
 });
 o.observe(document.documentElement,{childList:true,subtree:true});
