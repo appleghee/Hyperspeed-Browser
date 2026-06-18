@@ -60,10 +60,11 @@
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
+  var token = window.__mbToken || "";
   function api(m, path, bd) {
     return fetch("http://127.0.0.1:" + port + path, {
       method: m || "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-API-Token": token },
       body: bd ? JSON.stringify(bd) : null,
     })
       .then(function (r) {

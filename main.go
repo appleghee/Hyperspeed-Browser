@@ -1,8 +1,10 @@
 package main
 
 import (
-	"bytes"
 	_ "embed"
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -49,6 +51,7 @@ if(window.__mbHooks)return;
 window.__mbHooks=true;
 var L=[],WL=[],SL=[];
 window.__networkLog=L;window.__wsLog=WL;window.__sseLog=SL;
+window.__origFetch=window.fetch;window.__origXHR=XMLHttpRequest;window.__origWS=WebSocket;window.__origES=EventSource;
 var _f=window.fetch,_X=XMLHttpRequest,_W=WebSocket,_E=EventSource;
 function tr(s,m){return s&&typeof s=='string'?s.length<=m?s:s.slice(0,m)+' [truncated]':s}
 function rl(r,p){r.status=p.status;r.statusText=p.statusText;r.endTime=Date.now();r.contentType=p.headers.get('content-type')||'';
@@ -91,7 +94,8 @@ type browser struct {
 	idx     int
 	curr    string
 
-	apiPort int
+	apiPort  int
+	apiToken string
 
 	mu       sync.Mutex
 	evalID   int
@@ -102,11 +106,16 @@ type browser struct {
 	opt *Optimizer
 }
 
+func generateRandomToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 func main() {
 	w := webview.New(false)
 	defer w.Destroy()
 
-	w.SetTitle("Mini Browser")
 	w.SetSize(1024, 768, webview.HintNone)
 
 	startURL := "https://www.google.com"
@@ -116,6 +125,7 @@ func main() {
 		idx:      0,
 		curr:     startURL,
 		evalReqs: make(map[int]chan string),
+		apiToken: generateRandomToken(),
 	}
 
 	app.opt = NewOptimizer(app)
@@ -131,7 +141,7 @@ func main() {
 	go app.startAPI(apiReady)
 	<-apiReady
 	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d]", app.apiPort))
-	w.Init(fmt.Sprintf(`window.__mbPort=%d;`, app.apiPort))
+	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;`, app.apiPort, app.apiToken))
 
 	w.Init(toolbarJS)
 	w.Init(runtimeJS)
@@ -261,6 +271,7 @@ return nodes;
 // Optimizer GUI loaded via //go:embed optimizer-gui.js
 
 func (b *browser) injectTurboLoop() {
+	// inject once, retry if document.head not ready
 	for i := 0; i < 3; i++ {
 		b.w.Dispatch(func() {
 			b.w.Eval(turboDOM)
@@ -284,7 +295,7 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	b.apiPort = listener.Addr().(*net.TCPAddr).Port
 
 	b.portFile = filepath.Join(os.TempDir(), "hyperspeed-browser.port")
-	os.WriteFile(b.portFile, []byte(fmt.Sprintf("%d", b.apiPort)), 0644)
+	os.WriteFile(b.portFile, []byte(fmt.Sprintf("%d\n%s", b.apiPort, b.apiToken)), 0644)
 	log.Printf("[api] listening on 127.0.0.1:%d (port file: %s)", b.apiPort, b.portFile)
 	close(ready)
 
@@ -332,7 +343,7 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/opt/run", b.handleOptimizerRunAll)
 	mux.HandleFunc("/api/opt/tune", b.handleOptimizerTune)
 
-	b.srv = &http.Server{Handler: corsMiddleware(mux)}
+	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
 }
 
@@ -349,9 +360,19 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Token")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(204)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func authMiddleware(b *browser, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-API-Token") != b.apiToken {
+			writeError(w, 401, "unauthorized")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -698,7 +719,7 @@ func (b *browser) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *browser) handleScreenshot(w http.ResponseWriter, r *http.Request) {
-	winTitle := "Mini Browser"
+	winTitle := fmt.Sprintf("Hyperspeed Browser [:%d]", b.apiPort)
 	psScript := fmt.Sprintf(`
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms;
 Add-Type @"
@@ -763,7 +784,12 @@ func (b *browser) handleUnhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 405, "POST required")
 		return
 	}
-	b.syncExec(`window.fetch=window.__mbFetch||window.__origFetch;XMLHttpRequest=window.__origXHR;WebSocket=window.__origWS;EventSource=window.__origES`)
+	b.syncExec(`
+if(window.__origFetch)window.fetch=window.__origFetch;
+if(window.__origXHR)XMLHttpRequest=window.__origXHR;
+if(window.__origWS)WebSocket=window.__origWS;
+if(window.__origES)EventSource=window.__origES;
+window.__mbHooks=false`)
 	writeJSON(w, map[string]interface{}{"ok": true})
 }
 
@@ -795,7 +821,9 @@ func (b *browser) handleInfo(w http.ResponseWriter, r *http.Request) {
 func (b *browser) navigate(rawURL string) {
 	u := normalizeURL(rawURL)
 	urlStr := u.String()
+	b.mu.Lock()
 	if b.curr == urlStr {
+		b.mu.Unlock()
 		return
 	}
 	if b.idx < len(b.history)-1 {
@@ -804,6 +832,7 @@ func (b *browser) navigate(rawURL string) {
 	b.history = append(b.history, urlStr)
 	b.idx = len(b.history) - 1
 	b.curr = urlStr
+	b.mu.Unlock()
 	navJSON := fmt.Sprintf(`{"b":%t,"f":false}`, b.idx > 0)
 	b.w.Dispatch(func() {
 		b.w.Eval("window.name='" + navJSON + "'")

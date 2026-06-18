@@ -3,7 +3,13 @@ import sys, json, urllib.request, urllib.parse, os, tempfile
 sys.stdout.reconfigure(encoding='utf-8')
 
 port_file = os.path.join(tempfile.gettempdir(), "hyperspeed-browser.port")
-port = open(port_file).read().strip() if os.path.exists(port_file) else "52954"
+if not os.path.exists(port_file):
+    print("Lỗi: browser chưa chạy (không tìm thấy", port_file, ")")
+    sys.exit(1)
+with open(port_file) as f:
+    lines = f.read().strip().splitlines()
+    port = lines[0].strip()
+    token = lines[1].strip() if len(lines) > 1 else ""
 base = f"http://127.0.0.1:{port}"
 
 def deep_parse(s):
@@ -18,10 +24,14 @@ def deep_parse(s):
 
 def api(method, path, data=None):
     url = f"{base}{path}"
+    headers = {"X-API-Token": token}
     if data is not None:
-        req = urllib.request.Request(url, data=json.dumps(data).encode(), headers={"Content-Type": "application/json"}, method=method)
+        headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=json.dumps(data).encode(), headers=headers, method=method)
     else:
         req = urllib.request.Request(url, method=method)
+        for k, v in headers.items():
+            req.add_header(k, v)
     with urllib.request.urlopen(req) as r:
         return json.loads(r.read())
 
