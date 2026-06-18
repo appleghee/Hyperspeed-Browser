@@ -1,5 +1,11 @@
 *.exe
 *.exe~
 *.syso
+*.test
+*.out
+*.db
+*.db-shm
+.db-wal
 .codegraph/
 tmp/
+token-optimizer/
