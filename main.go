@@ -291,7 +291,7 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	}
 	b.apiPort = listener.Addr().(*net.TCPAddr).Port
 
-	b.portFile = filepath.Join(os.TempDir(), "mini-browser.port")
+	b.portFile = filepath.Join(os.TempDir(), "hyperspeed-browser.port")
 	os.WriteFile(b.portFile, []byte(fmt.Sprintf("%d", b.apiPort)), 0644)
 	log.Printf("[api] listening on 127.0.0.1:%d (port file: %s)", b.apiPort, b.portFile)
 	close(ready)

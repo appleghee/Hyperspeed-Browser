@@ -1,6 +1,6 @@
 import sys, json, urllib.request, os, tempfile
 
-port_file = os.path.join(tempfile.gettempdir(), "mini-browser.port")
+port_file = os.path.join(tempfile.gettempdir(), "hyperspeed-browser.port")
 port = open(port_file).read().strip() if os.path.exists(port_file) else "52954"
 base = f"http://127.0.0.1:{port}"
 

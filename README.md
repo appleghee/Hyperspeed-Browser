@@ -1,11 +1,11 @@
-# Aero Browser
+# Hyperspeed Browser
 
 > Ultra-lightweight Windows desktop browser powered by WebView2 with a local HTTP API for automation and headless-like control.
 
 [![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go)](https://go.dev)
 [![WebView2](https://img.shields.io/badge/WebView2-Edge%20Chromium-4FC3F7?logo=microsoftedge)](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)](https://github.com/appleghee/Hyperspeed-Browserr)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)](https://github.com/appleghee/Hyperspeed-Browser)
 
 ---
 
@@ -23,13 +23,13 @@
 ```bash
 # Build (requires MinGW-w64 with GCC in PATH)
 $env:CGO_ENABLED=1
-go build -o aero-browser.exe .
+go build -o hyperspeed-browser.exe .
 
 # Run
-./aero-browser.exe
+./hyperspeed-browser.exe
 ```
 
-The API port is printed in the window title (`Aero Browser [:<port>]`) and written to `%TEMP%\aero-browser.port`.
+The API port is printed in the window title (`Hyperspeed Browser [:<port>]`) and written to `%TEMP%\hyperspeed-browser.port`.
 
 ## API Overview
 
@@ -77,7 +77,7 @@ Full API docs at `GET /api` when the browser is running.
 
 ## Python Scripts
 
-Python tools auto-detect the API port from `%TEMP%\aero-browser.port`:
+Python tools auto-detect the API port from `%TEMP%\hyperspeed-browser.port`:
 
 ```bash
 python check_state.py    # Snapshot + clickable elements + storage + cookies
