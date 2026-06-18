@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Hyperspeed Console</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI','Cascadia Code',monospace;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+.console{width:700px;max-width:95vw;max-height:90vh;background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+h1{font-size:16px;font-weight:600;color:#58a6ff;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+h1 small{font-size:11px;color:#484f58;font-weight:400}
+.nav{display:flex;gap:4px;margin-bottom:16px;align-items:center}
+.nav button{background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:14px}
+.nav button:hover{background:#30363d}
+.nav button:disabled{opacity:.3;cursor:default}
+.nav input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px 12px;color:#c9d1d9;font-size:13px;outline:none;font-family:inherit}
+.nav input:focus{border-color:#58a6ff}
+.nav .go{background:#238636;border-color:#2ea043;color:#fff;padding:6px 16px;font-weight:600}
+.nav .go:hover{background:#2ea043}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.quick a{background:#21262d;border:1px solid #30363d;border-radius:8px;padding:10px 14px;color:#c9d1d9;text-decoration:none;font-size:13px;transition:all .15s}
+.quick a:hover{background:#30363d;border-color:#58a6ff;transform:translateY(-1px)}
+.quick a span{display:block;font-size:11px;color:#8b949e;margin-top:2px}
+.stats{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;margin-bottom:12px}
+.stats h2{font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap}
+.stat-item{flex:1;min-width:80px}
+.stat-item .val{font-size:18px;font-weight:700;color:#58a6ff}
+.stat-item .lbl{font-size:10px;color:#484f58;text-transform:uppercase}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px}
+.actions button:hover{background:#30363d}
+.actions .on{background:#238636;border-color:#2ea043}
+.actions .off{background:#da3633;border-color:#f85149}
+.footer{font-size:10px;color:#484f58;text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="console">
+  <h1>Hyperspeed Browser <small>v2.8.0</small></h1>
+
+  <div class="nav">
+    <button id="back" disabled>&#8592;</button>
+    <button id="fwd" disabled>&#8594;</button>
+    <button id="reload">&#8635;</button>
+    <input id="url" placeholder="Enter URL or search...">
+    <button class="go" id="go">Go</button>
+  </div>
+
+  <div class="quick">
+    <a href="#" data-url="https://google.com">Google Search <span>google.com</span></a>
+    <a href="#" data-url="https://youtube.com">YouTube <span>youtube.com</span></a>
+    <a href="#" data-url="https://github.com">GitHub <span>github.com</span></a>
+    <a href="#" data-url="https://reddit.com">Reddit <span>reddit.com</span></a>
+  </div>
+
+  <div class="stats">
+    <h2>DOM LOD Engine</h2>
+    <div class="stat-row" id="lodStats">
+      <div class="stat-item"><div class="val" id="lodTotal">-</div><div class="lbl">Nodes</div></div>
+      <div class="stat-item"><div class="val" id="lod0">-</div><div class="lbl">LOD0</div></div>
+      <div class="stat-item"><div class="val" id="lod3">-</div><div class="lbl">LOD3</div></div>
+      <div class="stat-item"><div class="val" id="lodMem">-</div><div class="lbl">MB Saved</div></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="toggleLOD" class="on">DOM LOD: ON</button>
+  </div>
+
+  <div class="footer">Ctrl+Shift+L = Search  |  Ctrl+Shift+Space = Optimizer</div>
+</div>
+
+<script>
+function go(u){if(u&&u.trim())window.goNavigate(u.trim())}
+
+function updateNav(){
+  try{
+    var s=JSON.parse(getNavState()||'{}');
+    document.getElementById('back').disabled=!s.b;
+    document.getElementById('fwd').disabled=!s.f;
+  }catch(e){}
+}
+
+document.getElementById('back').onclick=function(){window.goBack()};
+document.getElementById('fwd').onclick=function(){window.goForward()};
+document.getElementById('reload').onclick=function(){window.goReload()};
+
+var urlInp=document.getElementById('url');
+urlInp.onkeydown=function(e){if(e.key==='Enter')go(this.value)};
+document.getElementById('go').onclick=function(){go(urlInp.value)};
+
+document.querySelectorAll('.quick a').forEach(function(a){
+  a.onclick=function(e){e.preventDefault();go(this.getAttribute('data-url'))};
+});
+
+function fetchStats(){
+  fetch('/api/lod/stats',{headers:{'X-API-Token':window.__mbToken||''}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.ok&&d.stats){
+        document.getElementById('lodTotal').textContent=d.stats.total||0;
+        document.getElementById('lod0').textContent=d.stats.level0||0;
+        document.getElementById('lod3').textContent=d.stats.level3||0;
+        document.getElementById('lodMem').textContent=(d.stats.savedKB||0)+'KB';
+      }
+    })['catch'](function(){});
+}
+
+var lodOn=true;
+document.getElementById('toggleLOD').onclick=function(){
+  lodOn=!lodOn;
+  this.textContent='DOM LOD: '+(lodOn?'ON':'OFF');
+  this.className=lodOn?'on':'off';
+  fetch('/api/lod/toggle',{method:'POST',headers:{'Content-Type':'application/json','X-API-Token':window.__mbToken||''},body:JSON.stringify({action:'toggle'})})['catch'](function(){});
+};
+
+updateNav();
+fetchStats();
+setInterval(fetchStats,3000);
+</script>
+</body>
+</html>

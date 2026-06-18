@@ -27,6 +27,9 @@ var popupBlockerJS string
 //go:embed optimizer-gui.js
 var optimizerGUIJS string
 
+//go:embed startpage.html
+var startPageHTML string
+
 // Big overlay for non-tech users (Ctrl+Shift+L)
 const overlayJS = `(function(){
 if(window.__mbSearch)return;window.__mbSearch=true;
@@ -65,12 +68,12 @@ var d=document.createElement('div');d.id='__mb_bar';
 d.innerHTML='<button id="__mb_b">\u2039</button><button id="__mb_f">\u203A</button><button id="__mb_r">\u21bb</button><input id="__mb_u" placeholder="URL...">';
 function appendBar(){var b=document.body||document.documentElement;if(b){b.insertBefore(d,b.firstChild)}else{requestAnimationFrame(appendBar)}}
 appendBar();
-function ns(){try{return JSON.parse(window.name||'{}')}catch(e){return{}}}
+function gs(){try{var v=getNavState();return JSON.parse(v||'{}')}catch(e){return{}}}
 var o=new MutationObserver(function(){
 var u=document.getElementById('__mb_u'),b=document.getElementById('__mb_b'),f=document.getElementById('__mb_f'),r=document.getElementById('__mb_r');
 if(!u)return;
 o.disconnect();
-var s2=ns();
+var s2=gs();
 u.onkeydown=function(e){if(e.key=='Enter'&&u.value.trim())window.goNavigate(u.value.trim())};u.value=location.href;
 if(b){b.disabled=!s2.b;b.onclick=function(){window.goBack()}}
 if(f){f.disabled=!s2.f;f.onclick=function(){window.goForward()}}
@@ -137,7 +140,8 @@ type browser struct {
 	srv      *http.Server
 	portFile string
 
-	opt *Optimizer
+	startHTML string
+	opt       *Optimizer
 }
 
 func generateRandomToken() string {
@@ -152,7 +156,7 @@ func main() {
 
 	w.SetSize(1024, 768, webview.HintNone)
 
-	startURL := "https://www.google.com"
+	startURL := "hyperspeed://console"
 	app := &browser{
 		w:        w,
 		history:  []string{startURL},
@@ -160,6 +164,7 @@ func main() {
 		curr:     startURL,
 		evalReqs: make(map[int]chan string),
 		apiToken: generateRandomToken(),
+		startHTML: startPageHTML,
 	}
 
 	app.opt = NewOptimizer(app)
@@ -170,10 +175,19 @@ func main() {
 	must(w.Bind("goForward", app.goForward))
 	must(w.Bind("goReload", app.reload))
 	must(w.Bind("__evalCb", app.evalCallback))
+	must(w.Bind("getNavState", func() string {
+		app.mu.Lock()
+		defer app.mu.Unlock()
+		canBack := app.idx > 0
+		canFwd := app.idx < len(app.history)-1
+		bs := func(v bool) string { if v { return "true" }; return "false" }
+		return `{"b":` + bs(canBack) + `,"f":` + bs(canFwd) + `}`
+	}))
 
 	apiReady := make(chan struct{})
 	go app.startAPI(apiReady)
 	<-apiReady
+	app.opt.uhe.Start()
 	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d]", app.apiPort))
 
 	// Single Init call — all JS merged
@@ -407,6 +421,13 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/lod/stats", b.handleLODStats)
 	mux.HandleFunc("/api/lod/toggle", b.handleLODToggle)
 	mux.HandleFunc("/api/lod", b.handleLOD)
+
+	// UHE endpoints
+	mux.HandleFunc("/api/uhe/start", b.handleUHEStart)
+	mux.HandleFunc("/api/uhe/stats", b.handleUHEStats)
+	mux.HandleFunc("/api/uhe/access", b.handleUHEAccess)
+	mux.HandleFunc("/api/uhe/top", b.handleUHETop)
+	mux.HandleFunc("/api/uhe", b.handleUHE)
 
 	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
@@ -900,6 +921,14 @@ func (b *browser) handleInfo(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 // Navigation helpers
 
+func navTo(b *browser, urlStr string) {
+	if urlStr == "hyperspeed://console" || urlStr == "" {
+		b.w.Navigate("data:text/html," + url.PathEscape(b.startHTML))
+	} else {
+		b.w.Navigate(urlStr)
+	}
+}
+
 func (b *browser) navigate(rawURL string) {
 	u := normalizeURL(rawURL)
 	urlStr := u.String()
@@ -914,52 +943,15 @@ func (b *browser) navigate(rawURL string) {
 	b.history = append(b.history, urlStr)
 	b.idx = len(b.history) - 1
 	b.curr = urlStr
-	canBack := b.idx > 0
 	b.mu.Unlock()
-	var buf strings.Builder
-	buf.Grow(32)
-	buf.WriteString(`{"b":`)
-	if canBack {
-		buf.WriteString(`true`)
-	} else {
-		buf.WriteString(`false`)
-	}
-	buf.WriteString(`,"f":false}`)
-	navJSON := buf.String()
-	b.w.Dispatch(func() {
-		b.w.Eval("window.name='" + navJSON + "'")
-		b.w.Navigate(urlStr)
-	})
-}
-
-func navJSONBuilder(canBack, canForward bool) string {
-	var buf strings.Builder
-	buf.Grow(36)
-	buf.WriteString(`{"b":`)
-	if canBack {
-		buf.WriteString(`true`)
-	} else {
-		buf.WriteString(`false`)
-	}
-	buf.WriteString(`,"f":`)
-	if canForward {
-		buf.WriteString(`true`)
-	} else {
-		buf.WriteString(`false`)
-	}
-	buf.WriteString(`}`)
-	return buf.String()
+	b.w.Dispatch(func() { navTo(b, urlStr) })
 }
 
 func (b *browser) goBack() {
 	if b.idx > 0 {
 		b.idx--
 		b.curr = b.history[b.idx]
-		navJSON := navJSONBuilder(b.idx > 0, b.idx < len(b.history)-1)
-		b.w.Dispatch(func() {
-			b.w.Eval("window.name='" + navJSON + "'")
-			b.w.Navigate(b.curr)
-		})
+		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
 
@@ -967,24 +959,23 @@ func (b *browser) goForward() {
 	if b.idx < len(b.history)-1 {
 		b.idx++
 		b.curr = b.history[b.idx]
-		navJSON := navJSONBuilder(b.idx > 0, b.idx < len(b.history)-1)
-		b.w.Dispatch(func() {
-			b.w.Eval("window.name='" + navJSON + "'")
-			b.w.Navigate(b.curr)
-		})
+		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
 
 func (b *browser) reload() {
 	if b.curr != "" {
-		b.w.Dispatch(func() { b.w.Navigate(b.curr) })
+		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
 
 func normalizeURL(raw string) *url.URL {
 	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return &url.URL{Scheme: "https", Host: "google.com"}
+	if raw == "" || raw == "console" {
+		return &url.URL{Scheme: "hyperspeed", Host: "console"}
+	}
+	if raw == "hyperspeed://console" {
+		return &url.URL{Scheme: "hyperspeed", Host: "console"}
 	}
 	if !strings.Contains(raw, "://") && !strings.HasPrefix(raw, "about:") {
 		raw = "https://" + raw
