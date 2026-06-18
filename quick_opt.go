@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -301,20 +300,17 @@ func (q *QuickOptEngine) GatherStats() *QuickOptStats {
 }
 
 func (q *QuickOptEngine) gatherMDDP() *MDDPState {
-	val, err := q.b.syncUnwrap(`(function(){
-var s=window.__mbMDDP||{};
-return{hits:s._hits||0,tcp:s._tcp||0,cache:Object.keys(s.cache||{}).length};
-})()`, 5*time.Second)
-	if err != nil {
-		return q.mddp
-	}
-	b, _ := json.Marshal(val)
 	var s struct {
 		Hits  int `json:"hits"`
 		TCP   int `json:"tcp"`
 		Cache int `json:"cache"`
 	}
-	json.Unmarshal(b, &s)
+	if err := q.b.syncUnwrapInto(`(function(){
+var s=window.__mbMDDP||{};
+return{hits:s._hits||0,tcp:s._tcp||0,cache:Object.keys(s.cache||{}).length};
+})()`, 5*time.Second, &s); err != nil {
+		return q.mddp
+	}
 	q.mddp.DNSHits = s.Hits
 	q.mddp.TCPHits = s.TCP
 	q.mddp.CacheHits = s.Cache
@@ -322,20 +318,17 @@ return{hits:s._hits||0,tcp:s._tcp||0,cache:Object.keys(s.cache||{}).length};
 }
 
 func (q *QuickOptEngine) gatherHTP() *HTPState {
-	val, err := q.b.syncUnwrap(`(function(){
-var s=window.__mbHTP||{};
-return{hovers:s.hovers||0,cancels:s.cancels||0,connects:s.connects||0};
-})()`, 5*time.Second)
-	if err != nil {
-		return q.htp
-	}
-	b, _ := json.Marshal(val)
 	var s struct {
 		Hovers    int `json:"hovers"`
 		Cancels   int `json:"cancels"`
 		Connects  int `json:"connects"`
 	}
-	json.Unmarshal(b, &s)
+	if err := q.b.syncUnwrapInto(`(function(){
+var s=window.__mbHTP||{};
+return{hovers:s.hovers||0,cancels:s.cancels||0,connects:s.connects||0};
+})()`, 5*time.Second, &s); err != nil {
+		return q.htp
+	}
 	q.htp.Hovers = s.Hovers
 	q.htp.Cancels = s.Cancels
 	q.htp.Preconnects = s.Connects
@@ -343,21 +336,18 @@ return{hovers:s.hovers||0,cancels:s.cancels||0,connects:s.connects||0};
 }
 
 func (q *QuickOptEngine) gatherPSFQ() *PSFQState {
-	val, err := q.b.syncUnwrap(`(function(){
-var s=window.__mbPSFQ||{};
-return{critical:s.critical||0,high:s.high||0,low:s.low||0,total:s.total||0};
-})()`, 5*time.Second)
-	if err != nil {
-		return q.psfq
-	}
-	b, _ := json.Marshal(val)
 	var s struct {
 		Critical int `json:"critical"`
 		High     int `json:"high"`
 		Low      int `json:"low"`
 		Total    int `json:"total"`
 	}
-	json.Unmarshal(b, &s)
+	if err := q.b.syncUnwrapInto(`(function(){
+var s=window.__mbPSFQ||{};
+return{critical:s.critical||0,high:s.high||0,low:s.low||0,total:s.total||0};
+})()`, 5*time.Second, &s); err != nil {
+		return q.psfq
+	}
 	q.psfq.Critical = s.Critical
 	q.psfq.High = s.High
 	q.psfq.Low = s.Low
@@ -366,21 +356,18 @@ return{critical:s.critical||0,high:s.high||0,low:s.low||0,total:s.total||0};
 }
 
 func (q *QuickOptEngine) gatherDAE() *DAEState {
-	val, err := q.b.syncUnwrap(`(function(){
-var s=window.__mbDAE||{};
-return{decoded:s.decoded||0,evicted:s.evicted||0,restored:s.restored||0,obs:s.obs?1:0};
-})()`, 5*time.Second)
-	if err != nil {
-		return q.dae
-	}
-	b, _ := json.Marshal(val)
 	var s struct {
 		Decoded  int `json:"decoded"`
 		Evicted  int `json:"evicted"`
 		Restored int `json:"restored"`
 		Obs      int `json:"obs"`
 	}
-	json.Unmarshal(b, &s)
+	if err := q.b.syncUnwrapInto(`(function(){
+var s=window.__mbDAE||{};
+return{decoded:s.decoded||0,evicted:s.evicted||0,restored:s.restored||0,obs:s.obs?1:0};
+})()`, 5*time.Second, &s); err != nil {
+		return q.dae
+	}
 	q.dae.Decoded = s.Decoded
 	q.dae.Evicted = s.Evicted
 	q.dae.Restored = s.Restored
@@ -389,21 +376,18 @@ return{decoded:s.decoded||0,evicted:s.evicted||0,restored:s.restored||0,obs:s.ob
 }
 
 func (q *QuickOptEngine) gatherFDTF() *FDTFState {
-	val, err := q.b.syncUnwrap(`(function(){
-var s=window.__mbFDTF||{};
-return{loaded:s.loaded||0,fallbacks:s.fallbacks||0,swapped:s.swapped||0,locked:s.locked||0};
-})()`, 5*time.Second)
-	if err != nil {
-		return q.fdtf
-	}
-	b, _ := json.Marshal(val)
 	var s struct {
 		Loaded    int `json:"loaded"`
 		Fallbacks int `json:"fallbacks"`
 		Swapped   int `json:"swapped"`
 		Locked    int `json:"locked"`
 	}
-	json.Unmarshal(b, &s)
+	if err := q.b.syncUnwrapInto(`(function(){
+var s=window.__mbFDTF||{};
+return{loaded:s.loaded||0,fallbacks:s.fallbacks||0,swapped:s.swapped||0,locked:s.locked||0};
+})()`, 5*time.Second, &s); err != nil {
+		return q.fdtf
+	}
 	q.fdtf.FontsLoaded = s.Loaded
 	q.fdtf.Fallbacks = s.Fallbacks
 	q.fdtf.Swapped = s.Swapped

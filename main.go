@@ -82,7 +82,7 @@ var B=['google-analytics.com','googletagmanager.com','googleadservices.com','pag
 function m(u){return u?B.some(function(b){return u.indexOf(b)>=0}):false}
 var of=window.fetch;window.fetch=function(i,o){var u=typeof i=='string'?i:(i&&i.url)||'';return m(u)?Promise.resolve(new Response('',{status:204})):of.call(this,i,o)};
 window.__turboState='fetch ok';
-var Ox=XMLHttpRequest;XMLHttpRequest=function(){var x=new Ox(),bl=false;var op=x.open.bind(x);x.open=function(m,u){bl=m(u);if(!bl)op(m,u)};var sd=x.send.bind(x);x.send=function(b){if(!bl)sd(b)};return x};
+var Ox=XMLHttpRequest;XMLHttpRequest=function(){var x=new Ox(),bl=false;var op=x.open.bind(x);x.open=function(mtd,url){bl=m(url);if(!bl)op(mtd,url)};var sd=x.send.bind(x);x.send=function(b){if(!bl)sd(b)};return x};
 var os=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k[0]=='_')return;return os.call(this,k,v)};
 window.__turboState='hooks ok'}();
 }catch(e){window.__turboErr=String(e)}
@@ -141,12 +141,10 @@ func main() {
 	go app.startAPI(apiReady)
 	<-apiReady
 	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d]", app.apiPort))
-	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;`, app.apiPort, app.apiToken))
 
-	w.Init(toolbarJS)
-	w.Init(runtimeJS)
-	w.Init(popupBlockerJS)
-	w.Init(optimizerInitJS)
+	// Merge all JS injections into minimal calls (faster page init)
+	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;`, app.apiPort, app.apiToken))
+	w.Init(toolbarJS + runtimeJS + popupBlockerJS + optimizerInitJS)
 	w.Init(optimizerGUIJS)
 	w.Navigate(app.curr)
 	go app.injectTurboLoop()
@@ -271,14 +269,19 @@ return nodes;
 // Optimizer GUI loaded via //go:embed optimizer-gui.js
 
 func (b *browser) injectTurboLoop() {
-	// inject once, retry if document.head not ready
+	// inject with guard — only retry if document.head not ready
 	for i := 0; i < 3; i++ {
 		b.w.Dispatch(func() {
 			b.w.Eval(turboDOM)
 			b.w.Eval(spbUI)
 			b.w.Eval(spbUICode)
 		})
-		time.Sleep(500 * time.Millisecond)
+		if i == 0 {
+			// After first attempt, wait longer for page to settle
+			time.Sleep(800 * time.Millisecond)
+		} else {
+			time.Sleep(400 * time.Millisecond)
+		}
 	}
 }
 
@@ -480,6 +483,16 @@ func (b *browser) syncUnwrap(js string, timeout time.Duration) (interface{}, err
 // syncExec fire-and-forget eval (no result).
 func (b *browser) syncExec(js string) {
 	b.w.Dispatch(func() { b.w.Eval(js) })
+}
+
+// syncUnwrapInto eval JS and unmarshal directly into target struct — avoids the
+// json.Marshal→json.Unmarshal double-conversion pattern seen throughout the codebase.
+func (b *browser) syncUnwrapInto(js string, timeout time.Duration, target interface{}) error {
+	raw, err := b.syncEval(js, timeout)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(raw), target)
 }
 
 // ---------------------------------------------------------------------------
@@ -872,19 +885,48 @@ func (b *browser) navigate(rawURL string) {
 	b.history = append(b.history, urlStr)
 	b.idx = len(b.history) - 1
 	b.curr = urlStr
+	canBack := b.idx > 0
 	b.mu.Unlock()
-	navJSON := fmt.Sprintf(`{"b":%t,"f":false}`, b.idx > 0)
+	var buf strings.Builder
+	buf.Grow(32)
+	buf.WriteString(`{"b":`)
+	if canBack {
+		buf.WriteString(`true`)
+	} else {
+		buf.WriteString(`false`)
+	}
+	buf.WriteString(`,"f":false}`)
+	navJSON := buf.String()
 	b.w.Dispatch(func() {
 		b.w.Eval("window.name='" + navJSON + "'")
 		b.w.Navigate(urlStr)
 	})
 }
 
+func navJSONBuilder(canBack, canForward bool) string {
+	var buf strings.Builder
+	buf.Grow(36)
+	buf.WriteString(`{"b":`)
+	if canBack {
+		buf.WriteString(`true`)
+	} else {
+		buf.WriteString(`false`)
+	}
+	buf.WriteString(`,"f":`)
+	if canForward {
+		buf.WriteString(`true`)
+	} else {
+		buf.WriteString(`false`)
+	}
+	buf.WriteString(`}`)
+	return buf.String()
+}
+
 func (b *browser) goBack() {
 	if b.idx > 0 {
 		b.idx--
 		b.curr = b.history[b.idx]
-		navJSON := fmt.Sprintf(`{"b":%t,"f":%t}`, b.idx > 0, b.idx < len(b.history)-1)
+		navJSON := navJSONBuilder(b.idx > 0, b.idx < len(b.history)-1)
 		b.w.Dispatch(func() {
 			b.w.Eval("window.name='" + navJSON + "'")
 			b.w.Navigate(b.curr)
@@ -896,7 +938,7 @@ func (b *browser) goForward() {
 	if b.idx < len(b.history)-1 {
 		b.idx++
 		b.curr = b.history[b.idx]
-		navJSON := fmt.Sprintf(`{"b":%t,"f":%t}`, b.idx > 0, b.idx < len(b.history)-1)
+		navJSON := navJSONBuilder(b.idx > 0, b.idx < len(b.history)-1)
 		b.w.Dispatch(func() {
 			b.w.Eval("window.name='" + navJSON + "'")
 			b.w.Navigate(b.curr)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -196,13 +195,10 @@ func (r *RPCEngine) Start() {
 }
 
 func (r *RPCEngine) Gather() *RPCStats {
-	val, err := r.b.syncUnwrap(rpcGatherJS, 5*time.Second)
-	if err != nil {
+	var s RPCStats
+	if err := r.b.syncUnwrapInto(rpcGatherJS, 5*time.Second, &s); err != nil {
 		return &r.stats
 	}
-	b, _ := json.Marshal(val)
-	var s RPCStats
-	json.Unmarshal(b, &s)
 	r.mu.Lock()
 	r.stats = s
 	r.mu.Unlock()

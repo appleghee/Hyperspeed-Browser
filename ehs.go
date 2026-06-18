@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -119,22 +118,24 @@ var heat=50;
 if(src.match(/Analytics|analytics|tracker|ga|gtag|fbq|ads|advert/i))heat=5;
 else if(src.match(/onclick|addEventListener|onkey|onscroll|ontouch|onmouse|\.click|\.key|\.scroll/i))heat=200;
 else if(src.match(/rAF|requestAnimationFrame|animate|raf/i))heat=100;
-H._add(cb,ms||0,src,heat);
-return cb.toString().length;}
+var wrapper=function(){try{cb();}catch(ex){}};
+H._add(wrapper,ms||0,src,heat);
+return _st(wrapper,ms);}
 return _st(cb,ms);
 };
 var _si=setInterval;
 setInterval=function(cb,ms){
 if(typeof cb==='function'){
-var tag='interval_'+Date.now();
-H._add(cb,ms||1000,'interval',30);
-return tag;}
+var wrapper=function(){try{cb();}catch(ex){}};
+H._add(wrapper,ms||1000,'interval',30);
+return _si(wrapper,ms);}
 return _si(cb,ms);
 };
 var _raf=requestAnimationFrame;
 requestAnimationFrame=function(cb){
-H._add(cb,16,'raf',100);
-return Date.now();
+var wrapper=function(t){try{cb(t);}catch(ex){}};
+H._add(wrapper,16,'raf',100);
+return _raf(wrapper);
 };
 var _ric=requestIdleCallback;
 requestIdleCallback=function(cb,opts){
@@ -216,13 +217,10 @@ func (e *EHSEngine) Start() {
 }
 
 func (e *EHSEngine) Gather() *EHSStats {
-	val, err := e.b.syncUnwrap(ehsGatherJS, 5*time.Second)
-	if err != nil {
+	var s EHSStats
+	if err := e.b.syncUnwrapInto(ehsGatherJS, 5*time.Second, &s); err != nil {
 		return &e.stats
 	}
-	b, _ := json.Marshal(val)
-	var s EHSStats
-	json.Unmarshal(b, &s)
 	e.mu.Lock()
 	e.stats = s
 	e.mu.Unlock()

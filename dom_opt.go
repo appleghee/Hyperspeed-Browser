@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -123,13 +122,10 @@ func (r *RHDGCEngine) Start() {
 var rhdGatherJS = "(function(){var s=window.__mbRHD;if(!s)return{total:0,detached:0,frozen:0,destroyed:0,memoryMB:0,status:'n/a'};return s.stats();})()"
 
 func (r *RHDGCEngine) Gather() *RHDGCStats {
-	val, err := r.b.syncUnwrap(rhdGatherJS, 5*time.Second)
-	if err != nil {
+	var s RHDGCStats
+	if err := r.b.syncUnwrapInto(rhdGatherJS, 5*time.Second, &s); err != nil {
 		return &r.stats
 	}
-	b, _ := json.Marshal(val)
-	var s RHDGCStats
-	json.Unmarshal(b, &s)
 	r.mu.Lock()
 	r.stats = s
 	r.mu.Unlock()
@@ -273,16 +269,17 @@ else T.collapsed++;
 },
 _predict:function(){
 var T=this;
-var scrollDir=this.scrollDir;
+var vh=T.viewportH;
+var scrollDir=T.scrollDir;
 Object.keys(T.store).forEach(function(id){
 var s=T.store[id];
 if(!s||!s.el)return;
 if(s.state!=='COLLAPSED'&&s.state!=='SKELETON')return;
 var top=s.rect.top;
 if(scrollDir>0){
-if(top>0&&top<this.viewportH*1.5)T._expand(id);}
+if(top>0&&top<vh*1.5)T._expand(id);}
 else{
-if(top<this.viewportH&&top> -this.viewportH*0.5)T._expand(id);}
+if(top<vh&&top> -vh*0.5)T._expand(id);}
 });
 },
 _expand:function(id){
@@ -320,13 +317,10 @@ func (p *PVCEngine) Start() {
 var pvcGatherJS = "(function(){var s=window.__mbPVC;if(!s)return{total:0,full:0,skeleton:0,collapsed:0,expanded:0,memoryMB:0,status:'n/a'};return s.stats();})()"
 
 func (p *PVCEngine) Gather() *PVCStats {
-	val, err := p.b.syncUnwrap(pvcGatherJS, 5*time.Second)
-	if err != nil {
+	var s PVCStats
+	if err := p.b.syncUnwrapInto(pvcGatherJS, 5*time.Second, &s); err != nil {
 		return &p.stats
 	}
-	b, _ := json.Marshal(val)
-	var s PVCStats
-	json.Unmarshal(b, &s)
 	p.mu.Lock()
 	p.stats = s
 	p.mu.Unlock()

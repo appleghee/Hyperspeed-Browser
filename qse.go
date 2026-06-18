@@ -102,13 +102,10 @@ func (q *QSEEngine) Resolve(input string) (string, bool) {
 func (q *QSEEngine) GatherClickHeat() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	val, err := q.b.syncUnwrap("(function(){var q=window.__mbQSE;if(!q)return{};try{return JSON.stringify(q.clicks);}catch(e){return'{}';};})()", 5*time.Second)
-	if err != nil {
+	var clicks map[string]int
+	if err := q.b.syncUnwrapInto("(function(){var q=window.__mbQSE;if(!q)return{};try{return JSON.stringify(q.clicks);}catch(e){return'{}';};})()", 5*time.Second, &clicks); err != nil {
 		return
 	}
-	b, _ := json.Marshal(val)
-	var clicks map[string]int
-	json.Unmarshal(b, &clicks)
 	for d, c := range clicks {
 		q.clickHeat[d] = c
 	}

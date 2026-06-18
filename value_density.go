@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 )
@@ -112,19 +112,14 @@ func NewValueDensityEngine(b *browser) *ValueDensityEngine {
 }
 
 func (vd *ValueDensityEngine) Scan() (*VDStats, error) {
-	val, err := vd.b.syncUnwrap(vdScanJS, 15*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("vd scan failed: %w", err)
-	}
-	b, _ := json.Marshal(val)
 	var raw struct {
 		Nodes  []DOMNode `json:"nodes"`
 		Time   int       `json:"scanTime"`
 		Memory float64   `json:"memory"`
 		Total  int       `json:"total"`
 	}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return nil, fmt.Errorf("vd parse failed: %w", err)
+	if err := vd.b.syncUnwrapInto(vdScanJS, 15*time.Second, &raw); err != nil {
+		return nil, fmt.Errorf("vd scan failed: %w", err)
 	}
 	vd.mu.Lock()
 	vd.graph = raw.Nodes
@@ -184,27 +179,23 @@ func (vd *ValueDensityEngine) evictLowValue() {
 	}
 	sorted := make([]DOMNode, len(vd.graph))
 	copy(sorted, vd.graph)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].VD < sorted[i].VD {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].VD < sorted[j].VD
+	})
 	evictCount := int(float64(len(sorted)) * 0.15)
 	if evictCount < 1 {
 		evictCount = 1
 	}
-	candidates := sorted[:evictCount]
-	var uids []string
-	for _, c := range candidates {
-		if c.VD < 0.2 {
-			uids = append(uids, c.UID)
-		}
+	if evictCount > len(sorted) {
+		evictCount = len(sorted)
+	}
+	// Early exit if none are below threshold
+	if len(sorted) > 0 && sorted[evictCount-1].VD >= 0.2 {
+		return
 	}
 	evalJS := `(function(){
 var els=document.querySelectorAll('[data-vd]');
-var threshold=` + fmt.Sprintf("%.2f", 0.2) + `;
+var threshold=0.2;
 for(var i=0;i<els.length;i++){
 var v=parseFloat(els[i].getAttribute('data-vd'));
 if(!isNaN(v)&&v<threshold&&els[i].tagName!=='BODY'&&els[i].tagName!=='HTML'&&els[i].tagName!=='HEAD'){
@@ -213,11 +204,6 @@ if(els[i].tagName==='SCRIPT'||els[i].tagName==='LINK'){els[i].disabled=true;cont
 els[i].style.opacity='0.3';els[i].style.pointerEvents='none';els[i].setAttribute('data-vd-evicted','1');}
 }})()`
 	vd.b.syncExec(evalJS)
-}
-
-func toJSON(v interface{}) string {
-	b, _ := json.Marshal(v)
-	return string(b)
 }
 
 func (vd *ValueDensityEngine) Optimize() (*VDStats, error) {
@@ -232,22 +218,20 @@ func (vd *ValueDensityEngine) Optimize() (*VDStats, error) {
 
 func (vd *ValueDensityEngine) applyScheduling() {
 	vd.mu.Lock()
-	defer vd.mu.Unlock()
 	if len(vd.graph) == 0 {
+		vd.mu.Unlock()
 		return
 	}
-	sorted := make([]DOMNode, len(vd.graph))
-	copy(sorted, vd.graph)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].VD > sorted[i].VD {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	graph := make([]DOMNode, len(vd.graph))
+	copy(graph, vd.graph)
+	vd.mu.Unlock()
+
+	sort.Slice(graph, func(i, j int) bool {
+		return graph[i].VD > graph[j].VD
+	})
 	var highVD, lowVD int
 	var totalCost float64
-	for _, n := range sorted {
+	for _, n := range graph {
 		totalCost += n.CostScore
 		if n.VD > 1 {
 			highVD++
@@ -258,11 +242,15 @@ func (vd *ValueDensityEngine) applyScheduling() {
 	}
 	if lowVD > 3 && highVD < lowVD {
 		freezeJS := `(function(){
-var imgs=document.querySelectorAll('img[data-si]');
-for(var i=0;i<imgs.length;i++){
-var vd=parseFloat(imgs[i].getAttribute('data-vd')||'99');
-if(vd<0.2&&imgs[i].tagName==='IMG'){imgs[i].loading='lazy';if(!imgs[i].complete)imgs[i].style.visibility='hidden'}}
-var iframes=document.querySelectorAll('iframe');
+var all=document.querySelectorAll('[data-vd]');
+for(var i=0;i<all.length;i++){
+var vd=parseFloat(all[i].getAttribute('data-vd')||'99');
+var tag=all[i].tagName;
+if(vd>=0.2)continue;
+if(tag==='IMG'){all[i].loading='lazy';if(!all[i].complete)all[i].style.visibility='hidden'}
+else if(tag==='IFRAME'){var r=all[i].getBoundingClientRect();if(r.top>window.innerHeight+200&&r.bottom< -200)all[i].srcdoc='';}
+else if(tag!=='BODY'&&tag!=='HTML'&&tag!=='HEAD'){all[i].style.opacity='0.3';all[i].style.pointerEvents='none';}}
+var iframes=document.querySelectorAll('iframe:not([data-vd])');
 for(var i=0;i<iframes.length;i++){
 var r=iframes[i].getBoundingClientRect();
 if(r.top>window.innerHeight+200&&r.bottom< -200)iframes[i].srcdoc=''}})()`

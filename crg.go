@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -126,19 +123,14 @@ func NewCRGEngine(b *browser) *CRGEngine {
 }
 
 func (c *CRGEngine) Scan() (*CRGStats, error) {
-	val, err := c.b.syncUnwrap(crgScanJS, 15*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("crg scan failed: %w", err)
-	}
-	b, _ := json.Marshal(val)
 	var raw struct {
 		Nodes   []CRGNode `json:"nodes"`
 		Time    int       `json:"scanTime"`
 		Memory  float64   `json:"memory"`
 		Total   int       `json:"total"`
 	}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return nil, fmt.Errorf("crg parse failed: %w", err)
+	if err := c.b.syncUnwrapInto(crgScanJS, 15*time.Second, &raw); err != nil {
+		return nil, fmt.Errorf("crg scan failed: %w", err)
 	}
 	c.mu.Lock()
 	c.graph = raw.Nodes
@@ -178,18 +170,13 @@ func (c *CRGEngine) Track() error {
 }
 
 func (c *CRGEngine) Cache() error {
-	val, err := c.b.syncUnwrap(crgCacheJS(), 10*time.Second)
-	if err != nil {
-		return err
-	}
-	b, _ := json.Marshal(val)
 	var raw struct {
 		Stored    int `json:"stored"`
 		Reused    int `json:"reused"`
 		CacheSize int `json:"cacheSize"`
 	}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return nil
+	if err := c.b.syncUnwrapInto(crgCacheJS(), 10*time.Second, &raw); err != nil {
+		return err
 	}
 	c.mu.Lock()
 	c.hitCount += raw.Reused
@@ -231,11 +218,6 @@ func (c *CRGEngine) Optimize() (*CRGStats, error) {
 	}
 	c.Reuse()
 	return stats, nil
-}
-
-func crgFingerprint(input string) string {
-	h := sha256.Sum256([]byte(input))
-	return hex.EncodeToString(h[:8])
 }
 
 func (b *browser) handleCRGSnapshot(w http.ResponseWriter, r *http.Request) {

@@ -25,7 +25,6 @@ type Optimizer struct {
 	profile OptimizerProfile
 
 	metrics    *MetricsCollector
-	classifier *ResourceClassifier
 	csso       *CSSJSOptimizer
 	media      *MediaOptimizer
 	netq       *NetworkQueue
@@ -60,28 +59,28 @@ type OptimizerProfile struct {
 var defaultProfile = OptimizerProfile{
 	Name:                 "balanced",
 	SnapshotDepth:        12,
-	TurboBurstCount:      10,
-	TurboSlowIntervalMs:  3000,
+	TurboBurstCount:      8,
+	TurboSlowIntervalMs:  4000,
 	EvalTimeoutMs:        10000,
-	CacheMaxEntries:      200,
-	CacheTTLMs:           60000,
+	CacheMaxEntries:      250,
+	CacheTTLMs:           90000,
 	NetworkMaxConcurrent: 6,
-	LazyLoadImages:       false,
-	DeferNonCriticalCSS:  false,
-	DeferNonCriticalJS:   false,
-	RemoveTracking:       false,
-	AutoTuneEnabled:      false,
+	LazyLoadImages:       true,
+	DeferNonCriticalCSS:  true,
+	DeferNonCriticalJS:   true,
+	RemoveTracking:       true,
+	AutoTuneEnabled:      true,
 }
 
 var speedProfile = OptimizerProfile{
 	Name:                 "speed",
-	SnapshotDepth:        8,
-	TurboBurstCount:      5,
-	TurboSlowIntervalMs:  5000,
-	EvalTimeoutMs:        5000,
-	CacheMaxEntries:      500,
-	CacheTTLMs:           120000,
-	NetworkMaxConcurrent: 4,
+	SnapshotDepth:        6,
+	TurboBurstCount:      4,
+	TurboSlowIntervalMs:  6000,
+	EvalTimeoutMs:        4000,
+	CacheMaxEntries:      800,
+	CacheTTLMs:           300000,
+	NetworkMaxConcurrent: 3,
 	LazyLoadImages:       true,
 	DeferNonCriticalCSS:  true,
 	DeferNonCriticalJS:   true,
@@ -123,12 +122,12 @@ var ecoProfile = OptimizerProfile{
 
 var aggressiveProfile = OptimizerProfile{
 	Name:                 "aggressive",
-	SnapshotDepth:        6,
+	SnapshotDepth:        5,
 	TurboBurstCount:      3,
-	TurboSlowIntervalMs:  7000,
+	TurboSlowIntervalMs:  8000,
 	EvalTimeoutMs:        3000,
-	CacheMaxEntries:      800,
-	CacheTTLMs:           300000,
+	CacheMaxEntries:      1000,
+	CacheTTLMs:           600000,
 	NetworkMaxConcurrent: 2,
 	LazyLoadImages:       true,
 	DeferNonCriticalCSS:  true,
@@ -139,13 +138,13 @@ var aggressiveProfile = OptimizerProfile{
 
 var turboProfile = OptimizerProfile{
 	Name:                 "turbo",
-	SnapshotDepth:        5,
-	TurboBurstCount:      3,
-	TurboSlowIntervalMs:  8000,
-	EvalTimeoutMs:        3000,
-	CacheMaxEntries:      1000,
-	CacheTTLMs:           600000,
-	NetworkMaxConcurrent: 2,
+	SnapshotDepth:        4,
+	TurboBurstCount:      2,
+	TurboSlowIntervalMs:  10000,
+	EvalTimeoutMs:        2000,
+	CacheMaxEntries:      1500,
+	CacheTTLMs:           900000,
+	NetworkMaxConcurrent: 1,
 	LazyLoadImages:       true,
 	DeferNonCriticalCSS:  true,
 	DeferNonCriticalJS:   true,
@@ -175,7 +174,6 @@ func NewOptimizer(b *browser) *Optimizer {
 		enabled:    true,
 		profile:    defaultProfile,
 		metrics:    NewMetricsCollector(b),
-		classifier: NewResourceClassifier(),
 		csso:       NewCSSJSOptimizer(b),
 		media:      NewMediaOptimizer(b),
 		netq:       NewNetworkQueue(b),
@@ -342,120 +340,39 @@ func (mc *MetricsCollector) History() []PageMetrics {
 
 func (mc *MetricsCollector) Average() PageMetrics {
 	mc.mu.Lock()
-	defer mc.mu.Unlock()
-	if len(mc.history) == 0 {
+	n := len(mc.history)
+	if n == 0 {
+		mc.mu.Unlock()
 		return PageMetrics{Score: 100}
 	}
-	var avg PageMetrics
+	var lt, dr, tk, sc float64
+	var rc, scnt, ic, rqc, ec, dnc int
 	for _, m := range mc.history {
-		avg.LoadTimeMs += m.LoadTimeMs
-		avg.DOMReadyMs += m.DOMReadyMs
-		avg.ResourceCount += m.ResourceCount
-		avg.TotalSizeKB += m.TotalSizeKB
-		avg.ScriptCount += m.ScriptCount
-		avg.ImageCount += m.ImageCount
-		avg.RequestCount += m.RequestCount
-		avg.ErrorCount += m.ErrorCount
-		avg.Score += m.Score
-		avg.DOMNodeCount += m.DOMNodeCount
+		lt += m.LoadTimeMs
+		dr += m.DOMReadyMs
+		rc += m.ResourceCount
+		tk += m.TotalSizeKB
+		scnt += m.ScriptCount
+		ic += m.ImageCount
+		rqc += m.RequestCount
+		ec += m.ErrorCount
+		sc += m.Score
+		dnc += m.DOMNodeCount
 	}
-	n := float64(len(mc.history))
-	avg.LoadTimeMs /= n
-	avg.DOMReadyMs /= n
-	avg.ResourceCount = int(float64(avg.ResourceCount) / n)
-	avg.TotalSizeKB /= n
-	avg.ScriptCount = int(float64(avg.ScriptCount) / n)
-	avg.ImageCount = int(float64(avg.ImageCount) / n)
-	avg.RequestCount = int(float64(avg.RequestCount) / n)
-	avg.ErrorCount = int(float64(avg.ErrorCount) / n)
-	avg.Score /= n
-	avg.DOMNodeCount = int(float64(avg.DOMNodeCount) / n)
-	return avg
-}
-
-// =============================================================================
-// 2. ResourceClassifier - phân loại tài nguyên
-// =============================================================================
-
-type Priority int
-
-const (
-	PriorityCritical Priority = iota
-	PriorityHigh
-	PriorityMedium
-	PriorityLow
-	PriorityBlocked
-)
-
-func (p Priority) String() string {
-	return []string{"critical", "high", "medium", "low", "blocked"}[p]
-}
-
-type ResourceInfo struct {
-	URL        string   `json:"url"`
-	Type       string   `json:"type"`
-	Size       int      `json:"size"`
-	Priority   Priority `json:"priority"`
-	InViewport bool     `json:"inViewport"`
-	IsTracking bool     `json:"isTracking"`
-}
-
-const classifyJS = `(function(){
-var trackers=['google-analytics','googletagmanager','facebook.net','doubleclick','hotjar','mouseflow','fullstory','amplitude','mixpanel','segment.io','scorecardresearch','quantserve','optimizely','crazyegg','clarity.ms','adsystem','adservice','adserver','advertising'];
-var B=document.body;if(!B)return'[]';
-function inView(el){var r=el.getBoundingClientRect();return r.top<window.innerHeight&&r.bottom>0}
-var res=[];
-var imgs=document.querySelectorAll('img');for(var i=0;i<imgs.length;i++){
-var s=imgs[i].getAttribute('src')||'';if(!s)continue;
-res.push({url:s,type:'image',size:0,inViewport:inView(imgs[i]),isTracking:false,priority:s.indexOf('data:')===0?3:inView(imgs[i])?1:2})}
-var ls=document.querySelectorAll('link[rel=stylesheet]');for(var i=0;i<ls.length;i++){
-var h=ls[i].href;if(!h)continue;var isT=trackers.some(function(t){return h.indexOf(t)>=0});
-res.push({url:h,type:'stylesheet',size:0,inViewport:i<3,isTracking:isT,priority:isT?4:i<2?0:2})}
-var ss=document.querySelectorAll('script[src]');for(var i=0;i<ss.length;i++){
-var h=ss[i].src;if(!h)continue;var isT=trackers.some(function(t){return h.indexOf(t)>=0});
-var isAsync=ss[i].async||ss[i].defer;var isModule=ss[i].type==='module';
-res.push({url:h,type:'script',size:0,inViewport:i<3,isTracking:isT,priority:isModule?0:isT?4:i<3?0:isAsync?2:1})}
-return JSON.stringify(res)})()`
-
-func NewResourceClassifier() *ResourceClassifier {
-	return &ResourceClassifier{
-		trackerDomains: []string{"doubleclick.net", "googletagmanager.com/gtm"},
+	mc.mu.Unlock()
+	nf := float64(n)
+	return PageMetrics{
+		LoadTimeMs:    lt / nf,
+		DOMReadyMs:    dr / nf,
+		ResourceCount: int(float64(rc) / nf),
+		TotalSizeKB:   tk / nf,
+		ScriptCount:   int(float64(scnt) / nf),
+		ImageCount:    int(float64(ic) / nf),
+		RequestCount:  int(float64(rqc) / nf),
+		ErrorCount:    int(float64(ec) / nf),
+		Score:         sc / nf,
+		DOMNodeCount:  int(float64(dnc) / nf),
 	}
-}
-
-type ResourceClassifier struct {
-	trackerDomains []string
-}
-
-func (rc *ResourceClassifier) Classify(urlStr, resType string, size int, inViewport bool) Priority {
-	if rc.isTracker(urlStr) {
-		return PriorityBlocked
-	}
-	if resType == "stylesheet" || resType == "script" {
-		if inViewport {
-			return PriorityCritical
-		}
-		return PriorityHigh
-	}
-	if resType == "image" {
-		if strings.HasPrefix(urlStr, "data:") || strings.HasPrefix(urlStr, "blob:") {
-			return PriorityLow
-		}
-		if inViewport {
-			return PriorityHigh
-		}
-		return PriorityMedium
-	}
-	return PriorityMedium
-}
-
-func (rc *ResourceClassifier) isTracker(url string) bool {
-	for _, d := range rc.trackerDomains {
-		if strings.Contains(url, d) {
-			return true
-		}
-	}
-	return false
 }
 
 const priorityInjectJS = `(function(){
@@ -504,22 +421,22 @@ func TuneCompiler(profile string) {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	case "balanced":
 		debug.SetGCPercent(100)
-		debug.SetMemoryLimit(512 * 1024 * 1024)
+		debug.SetMemoryLimit(384 * 1024 * 1024)
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	case "eco":
 		debug.SetGCPercent(150)
-		debug.SetMemoryLimit(384 * 1024 * 1024)
+		debug.SetMemoryLimit(256 * 1024 * 1024)
 		runtime.GOMAXPROCS(2)
 	case "compat":
 		debug.SetGCPercent(200)
-		debug.SetMemoryLimit(0)
+		debug.SetMemoryLimit(512 * 1024 * 1024)
 		runtime.GOMAXPROCS(1)
 	case "aggressive":
 		debug.SetGCPercent(30)
 		debug.SetMemoryLimit(192 * 1024 * 1024)
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	case "turbo":
-		debug.SetGCPercent(20)
+		debug.SetGCPercent(15)
 		debug.SetMemoryLimit(128 * 1024 * 1024)
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	case "mobile":
@@ -610,6 +527,8 @@ window.__mbMediaOptimized=imgs.length;
 // =============================================================================
 // 6. NetworkQueue - throttle mạng và hàng đợi request
 // =============================================================================
+
+type Priority int
 
 type RequestItem struct {
 	ID        string    `json:"id"`
@@ -756,23 +675,19 @@ func NewSmartCache(maxEntries int, ttlMs int) *SmartCache {
 }
 
 func (sc *SmartCache) Get(key string) (interface{}, bool) {
-	sc.mu.RLock()
+	sc.mu.Lock()
 	entry, ok := sc.entries[key]
-	sc.mu.RUnlock()
 	if !ok {
-		sc.mu.Lock()
 		sc.misses++
 		sc.mu.Unlock()
 		return nil, false
 	}
 	if time.Since(entry.createdAt) > entry.ttl {
-		sc.mu.Lock()
 		delete(sc.entries, key)
 		sc.evicted++
 		sc.mu.Unlock()
 		return nil, false
 	}
-	sc.mu.Lock()
 	entry.hitCount++
 	sc.hits++
 	sc.mu.Unlock()
@@ -809,6 +724,14 @@ func (sc *SmartCache) evictOldest() {
 	if oldestKey != "" {
 		delete(sc.entries, oldestKey)
 		sc.evicted++
+		// Batch evict expired entries too during scan
+		now := time.Now()
+		for k, v := range sc.entries {
+			if now.Sub(v.createdAt) > v.ttl {
+				delete(sc.entries, k)
+				sc.evicted++
+			}
+		}
 	}
 }
 
@@ -1207,7 +1130,7 @@ var of=window.__origFetch||window.fetch;
 window.fetch=function(i,o){var u=typeof i=='string'?i:(i&&i.url)||'';return m(u)?Promise.resolve(new Response('',{status:204})):of.call(this,i,o)};
 var Ox=XMLHttpRequest;if(!window.__mbXHRBlocked){window.__mbXHRBlocked=true;
 var X=Ox;XMLHttpRequest=function(){var x=new X(),bl=false;
-var op=x.open.bind(x);x.open=function(m,u){bl=m(u);if(!bl)op(m,u)};
+var op=x.open.bind(x);x.open=function(mtd,url){bl=m(url);if(!bl)op(mtd,url)};
 var sd=x.send.bind(x);x.send=function(b){if(!bl)sd(b)};return x}}
 })();
 (function(){
