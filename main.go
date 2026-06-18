@@ -371,6 +371,11 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/rpc/start", b.handleRPCStart)
 	mux.HandleFunc("/api/rpc/stats", b.handleRPCStats)
 
+	// QSE endpoints
+	mux.HandleFunc("/api/qse/start", b.handleQSEStart)
+	mux.HandleFunc("/api/qse/stats", b.handleQSEStats)
+	mux.HandleFunc("/api/qse/add", b.handleQSEAdd)
+
 	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
 }
@@ -525,6 +530,13 @@ func (b *browser) handleNavigate(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, 400, "invalid JSON: "+err.Error())
 		return
+	}
+	if b.opt != nil && b.opt.qse != nil {
+		if resolved, ok := b.opt.qse.Resolve(body.URL); ok {
+			b.navigate(resolved)
+			writeJSON(w, map[string]interface{}{"ok": true, "shortcut": true, "resolved": resolved})
+			return
+		}
 	}
 	b.navigate(body.URL)
 	writeJSON(w, map[string]interface{}{"ok": true})

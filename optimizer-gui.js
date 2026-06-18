@@ -100,6 +100,9 @@
     '<div class="opt-stat"><div><b id="__mb_rpc_e">-</b><s>Entries</s></div><div><b id="__mb_rpc_h">-</b><s>HitRate</s></div><div><b id="__mb_rpc_g">-</b><s>Genomes</s></div></div>' +
     '<div class="opt-act"><button class="opt-btn opt-btn-p" id="__mb_rpc_start">\u25b6 RPC</button>' +
     '<button class="opt-btn opt-btn-s" id="__mb_rpc_st">\u2139 Stats</button></div></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:5px"><div class="opt-gl">\u2318 Query Shortcuts</div>' +
+    '<div class="opt-stat"><div><b id="__mb_qse_s">-</b><s>Shortcuts</s></div><div><b id="__mb_qse_r">-</b><s>Used</s></div><div><b id="__mb_qse_t">-</b><s>Top</s></div></div>' +
+    '<span style="font-size:8px;color:#666;display:block;padding:2px 4px">gh react, yt cats, w html, so python, npm lodash</span></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -167,7 +170,7 @@
           m.requestCount || "-";
       }
     });
-    vdScan();crgScan();qStats();
+    vdScan();crgScan();qStats();qseStats();
   }
   document.getElementById("__mb_opt_m").onclick = rs;
   document.getElementById("__mb_opt_x").onclick = function () {
@@ -328,6 +331,16 @@
   document.getElementById("__mb_rpc_start").onclick = function() {
     api("POST", "/api/rpc/start").then(function(d) { if(d && d.ok) rpcStats(); });
   };
+  function qseStats() {
+    api("GET", "/api/qse/stats").then(function (d) {
+      if (d && d.stats) {
+        var s = d.stats;
+        document.getElementById("__mb_qse_s").textContent = s.shortcuts;
+        document.getElementById("__mb_qse_r").textContent = s.resolved;
+        document.getElementById("__mb_qse_t").textContent = s.topDomain || "-";
+      }
+    });
+  }
   document.getElementById("__mb_rpc_st").onclick = rpcStats;
   document.getElementById("__mb_ehs_st").onclick = ehsStats;
   document.getElementById("__mb_rhd_st").onclick = rhdStats;
@@ -341,7 +354,7 @@
   window.__mbRunCustomScript = runScript;
   bg("balanced");
   qInject(); rhdStats();
-  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start"); api("POST", "/api/ehs/start"); api("POST", "/api/rpc/start");
+  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start"); api("POST", "/api/ehs/start"); api("POST", "/api/rpc/start"); api("POST", "/api/qse/start");
   window.__mbOptGUI = true;
 })();
 (function () {
