@@ -130,7 +130,7 @@ func main() {
 	apiReady := make(chan struct{})
 	go app.startAPI(apiReady)
 	<-apiReady
-	w.SetTitle(fmt.Sprintf("Mini Browser [:%d]", app.apiPort))
+	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d]", app.apiPort))
 	w.Init(fmt.Sprintf(`window.__mbPort=%d;`, app.apiPort))
 
 	w.Init(toolbarJS)
