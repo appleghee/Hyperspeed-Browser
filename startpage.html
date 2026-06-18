@@ -38,12 +38,13 @@ h1 small{font-size:11px;color:#484f58;font-weight:400}
 </head>
 <body>
 <div class="console">
-  <h1>Hyperspeed Browser <small>v2.8.0</small></h1>
+  <h1>Hyperspeed Browser <small>v2.9.0</small></h1>
 
   <div class="nav">
     <button id="back" disabled>&#8592;</button>
     <button id="fwd" disabled>&#8594;</button>
     <button id="reload">&#8635;</button>
+    <button id="resume" style="background:#238636;border-color:#2ea043;color:#fff;font-weight:600;padding:6px 14px;border-radius:6px;border:1px solid;cursor:pointer;font-size:14px;">Resume</button>
     <input id="url" placeholder="Enter URL or search...">
     <button class="go" id="go">Go</button>
   </div>
@@ -87,6 +88,13 @@ document.getElementById('back').onclick=function(){window.goBack()};
 document.getElementById('fwd').onclick=function(){window.goForward()};
 document.getElementById('reload').onclick=function(){window.goReload()};
 
+document.getElementById('resume').onclick=function(){
+  fetch('/api/browse/last',{headers:{'X-API-Token':window.__mbToken||''}})
+    .then(function(r){return r.json()})
+    .then(function(d){if(d.ok&&d.url)go(d.url)})
+    ['catch'](function(){go('https://google.com')})
+};
+
 var urlInp=document.getElementById('url');
 urlInp.onkeydown=function(e){if(e.key==='Enter')go(this.value)};
 document.getElementById('go').onclick=function(){go(urlInp.value)};
@@ -119,6 +127,12 @@ document.getElementById('toggleLOD').onclick=function(){
 updateNav();
 fetchStats();
 setInterval(fetchStats,3000);
+
+// Prefetch last URL on load for quick resume
+fetch('/api/browse/last',{headers:{'X-API-Token':window.__mbToken||''}})
+  .then(function(r){return r.json()})
+  .then(function(d){if(d.ok&&d.url){urlInp.placeholder='Last: '+d.url;}})
+  ['catch'](function(){});
 </script>
 </body>
 </html>

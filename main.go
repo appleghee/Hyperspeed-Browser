@@ -134,7 +134,9 @@ type browser struct {
 	apiPort  int
 	apiToken string
 
-	mu       sync.Mutex
+	mu              sync.Mutex
+	lastBrowseURL   string
+	browseHistory   []string
 	evalID   int
 	evalReqs map[int]chan string
 	srv      *http.Server
@@ -423,6 +425,18 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/lod", b.handleLOD)
 
 	// UHE endpoints
+	// Browse history endpoints
+	mux.HandleFunc("/api/browse/last", b.handleBrowseLast)
+	mux.HandleFunc("/api/browse/history", b.handleBrowseHistory)
+
+	// NDF endpoints
+	mux.HandleFunc("/api/ndf/stats", b.handleNDFStats)
+	mux.HandleFunc("/api/ndf/clear", b.handleNDFClear)
+
+	// AutoTune endpoints
+	mux.HandleFunc("/api/autotune/profiles", b.handleAutoTuneProfiles)
+	mux.HandleFunc("/api/autotune/metrics", b.handleAutoTuneMetrics)
+
 	mux.HandleFunc("/api/uhe/start", b.handleUHEStart)
 	mux.HandleFunc("/api/uhe/stats", b.handleUHEStats)
 	mux.HandleFunc("/api/uhe/access", b.handleUHEAccess)
@@ -943,6 +957,17 @@ func (b *browser) navigate(rawURL string) {
 	b.history = append(b.history, urlStr)
 	b.idx = len(b.history) - 1
 	b.curr = urlStr
+	
+	// Track non-console URLs for resume
+	if urlStr != "hyperspeed://console" {
+		b.lastBrowseURL = urlStr
+		if len(b.browseHistory) == 0 || b.browseHistory[len(b.browseHistory)-1] != urlStr {
+			b.browseHistory = append(b.browseHistory, urlStr)
+			if len(b.browseHistory) > 10 {
+				b.browseHistory = b.browseHistory[1:]
+			}
+		}
+	}
 	b.mu.Unlock()
 	b.w.Dispatch(func() { navTo(b, urlStr) })
 }
@@ -967,6 +992,75 @@ func (b *browser) reload() {
 	if b.curr != "" {
 		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
+}
+
+func (b *browser) handleBrowseLast(w http.ResponseWriter, r *http.Request) {
+	b.mu.Lock()
+	last := b.lastBrowseURL
+	b.mu.Unlock()
+	if last == "" {
+		last = "https://google.com"
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "url": last})
+}
+
+func (b *browser) handleBrowseHistory(w http.ResponseWriter, r *http.Request) {
+	b.mu.Lock()
+	hist := make([]string, len(b.browseHistory))
+	copy(hist, b.browseHistory)
+	b.mu.Unlock()
+	writeJSON(w, map[string]interface{}{"ok": true, "history": hist})
+}
+
+func (b *browser) handleNDFStats(w http.ResponseWriter, r *http.Request) {
+	if b.opt == nil || b.opt.ndf == nil {
+		writeError(w, 503, "NDF not init")
+		return
+	}
+	stats := b.opt.ndf.Stats()
+	writeJSON(w, map[string]interface{}{"ok": true, "stats": stats})
+}
+
+func (b *browser) handleNDFClear(w http.ResponseWriter, r *http.Request) {
+	if b.opt == nil || b.opt.ndf == nil {
+		writeError(w, 503, "NDF not init")
+		return
+	}
+	b.opt.ndf.Clear()
+	writeJSON(w, map[string]interface{}{"ok": true, "msg": "NDF cache cleared"})
+}
+
+func (b *browser) handleAutoTuneProfiles(w http.ResponseWriter, r *http.Request) {
+	if b.opt == nil || b.opt.autotune == nil {
+		writeError(w, 503, "AutoTune not init")
+		return
+	}
+	profiles := b.opt.autotune.AllProfiles()
+	writeJSON(w, map[string]interface{}{"ok": true, "profiles": profiles})
+}
+
+func (b *browser) handleAutoTuneMetrics(w http.ResponseWriter, r *http.Request) {
+	if b.opt == nil || b.opt.autotune == nil {
+		writeError(w, 503, "AutoTune not init")
+		return
+	}
+	if r.Method != "POST" {
+		writeError(w, 405, "POST required")
+		return
+	}
+	var req struct {
+		Domain string  `json:"domain"`
+		CPU    float64 `json:"cpu"`
+		Memory float64 `json:"memory"`
+		Network float64 `json:"network"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "bad request")
+		return
+	}
+	b.opt.autotune.RecordMetrics(req.Domain, req.CPU, req.Memory, req.Network)
+	rec := b.opt.autotune.Recommend(req.Domain)
+	writeJSON(w, map[string]interface{}{"ok": true, "recommendation": rec})
 }
 
 func normalizeURL(raw string) *url.URL {

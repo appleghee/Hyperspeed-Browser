@@ -40,6 +40,8 @@ type Optimizer struct {
 	qse        *QSEEngine
 	lod        *LODEngine
 	uhe        *UHEngine
+	ndf        *NDFCache
+	autotune   *AutoTuneUHE
 }
 
 type OptimizerProfile struct {
@@ -191,8 +193,11 @@ func NewOptimizer(b *browser) *Optimizer {
 		qse:        NewQSEEngine(b),
 		lod:        NewLODEngine(b),
 		uhe:        NewUHEngine(),
+		ndf:        NewNDFCache(128),
+		autotune:   NewAutoTuneUHE(),
 	}
 	o.netq.maxConcurrent = defaultProfile.NetworkMaxConcurrent
+	o.autotune.Start()
 	return o
 }
 
