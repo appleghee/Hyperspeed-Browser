@@ -29,65 +29,23 @@ var optimizerGUIJS string
 
 // Big overlay for non-tech users (Ctrl+Shift+L)
 const overlayJS = `(function(){
-if(window.__mbOverlay)return;window.__mbOverlay=true;
-var _s=document.createElement('style');
-_s.textContent='#__mb_overlay{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;opacity:0;pointer-events:none;transition:opacity 0.2s;color:#e0e0e0}'+
-'#__mb_overlay.show{opacity:1;pointer-events:auto}'+
-'#__mb_overlay_inner{background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:480px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.6)}'+
-'#__mb_overlay_inner h2{margin:0 0 16px;font-size:18px;display:flex;align-items:center;gap:8px}'+
-'#__mb_overlay_inner h2 s{color:#4fc3f7}'+
-'#__mb_ol_search{width:100%;padding:12px 14px;background:#2d2d2d;border:1px solid #444;border-radius:10px;color:#fff;font-size:15px;outline:none;box-sizing:border-box;margin-bottom:12px}'+
-'#__mb_ol_search:focus{border-color:#4fc3f7}'+
-'#__mb_ol_search::placeholder{color:#777}'+
-'#__mb_ol_nav{display:flex;gap:6px;margin-bottom:14px}'+
-'#__mb_ol_nav button{flex:1;padding:10px;border:none;border-radius:8px;background:#2d2d2d;color:#ccc;font-size:14px;cursor:pointer;font-family:inherit}'+
-'#__mb_ol_nav button:hover{background:#3d3d3d;color:#fff}'+
-'#__mb_ol_section{margin-bottom:12px}'+
-'#__mb_ol_section label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#888;margin-bottom:4px}'+
-'#__mb_ol_mode{width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#2d2d2d;color:#ddd;font-family:inherit;font-size:13px;outline:none}'+
-'#__mb_ol_mode:focus{border-color:#4fc3f7}'+
-'#__mb_ol_toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}'+
-'#__mb_ol_toggles label{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#2d2d2d;border-radius:8px;cursor:pointer;font-size:12px}'+
-'#__mb_ol_toggles input{accent-color:#4fc3f7}'+
-'#__mb_ol_actions{display:flex;gap:6px;margin-bottom:12px}'+
-'#__mb_ol_actions button{flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600}'+
-'#__mb_ol_go{background:#4fc3f7;color:#000}#__mb_ol_opt{background:rgba(79,195,247,0.2);color:#4fc3f7}#__mb_ol_snap{background:rgba(255,255,255,0.08);color:#bbb}'+
-'#__mb_ol_stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center}'+
-'#__mb_ol_stats div{padding:8px 4px;background:#2d2d2d;border-radius:8px}'+
-'#__mb_ol_stats b{display:block;font-size:16px;color:#4fc3f7}#__mb_ol_stats s{font-size:10px;color:#888}'+
-'#__mb_ol_close{position:absolute;top:12px;right:16px;background:none;border:none;color:#aaa;font-size:22px;cursor:pointer}';
-document.head.appendChild(_s);
-var _ov=document.createElement('div');_ov.id='__mb_overlay';
-_ov.innerHTML='<button id="__mb_ol_close">&times;</button><div id="__mb_overlay_inner">'+
-'<h2><s>&#9889;</s> Hyperspeed Browser</h2>'+
-'<input id="__mb_ol_search" placeholder="Search URL or type...">'+
-'<div id="__mb_ol_nav"><button id="__mb_ol_b">&#8249; Back</button><button id="__mb_ol_f">Forward &#8250;</button><button id="__mb_ol_r">&#8635; Reload</button></div>'+
-'<div id="__mb_ol_section"><label>Optimizer mode</label><select id="__mb_ol_mode"><option value="turbo">Turbo</option><option value="aggressive">Aggressive</option><option value="speed">Speed</option><option value="balanced" selected>Balanced</option><option value="eco">Eco</option><option value="mobile">Mobile</option><option value="compat">Compat</option></select></div>'+
-'<div id="__mb_ol_toggles"><label><input type="checkbox" checked id="__mb_ol_ti">Lazy images</label><label><input type="checkbox" checked id="__mb_ol_tj">Defer JS</label><label><input type="checkbox" checked id="__mb_ol_tt">Block trackers</label><label><input type="checkbox" checked id="__mb_ol_tc">Smart cache</label></div>'+
-'<div id="__mb_ol_actions"><button id="__mb_ol_go">&#9654; Go</button><button id="__mb_ol_opt">&#9889; Optimize</button><button id="__mb_ol_snap">&#9776; Snapshot</button></div>'+
-'<div id="__mb_ol_stats"><div><b id="__mb_ol_s">-</b><s>Score</s></div><div><b id="__mb_ol_l">-</b><s>Load(ms)</s></div><div><b id="__mb_ol_r2">-</b><s>Requests</s></div></div>'+
-'</div>';
-document.body.appendChild(_ov);
-var _pt=window.__mbPort||0,_tk=window.__mbToken||"";
-function _api(m,pa,bd){return fetch("http://127.0.0.1:"+_pt+pa,{method:m||"GET",headers:{"Content-Type":"application/json","X-API-Token":_tk},body:bd?JSON.stringify(bd):null}).then(function(r){return r.json()})["catch"](function(){return null})}
-function _olShow(){_ov.classList.add("show");_olRefresh()}
-function _olHide(){_ov.classList.remove("show")}
-_ov.onclick=function(e){if(e.target===_ov)_olHide()};
-document.getElementById("__mb_ol_close").onclick=_olHide;
-document.getElementById("__mb_ol_search").onkeydown=function(e){if(e.key=="Enter"){var v=this.value.trim();if(v){window.goNavigate(v);_olHide()}}};
-document.getElementById("__mb_ol_go").onclick=function(){var v=document.getElementById("__mb_ol_search").value.trim();if(v){window.goNavigate(v);_olHide()}};
-document.getElementById("__mb_ol_b").onclick=function(){window.goBack();_olHide()};
-document.getElementById("__mb_ol_f").onclick=function(){window.goForward();_olHide()};
-document.getElementById("__mb_ol_r").onclick=function(){window.goReload();_olHide()};
-document.getElementById("__mb_ol_mode").onchange=function(){var v=this.value;_api("POST","/api/opt/profile",{profile:v})};
-document.getElementById("__mb_ol_ti").onchange=function(){_api("POST","/api/opt/toggle",{key:"lazyImages",val:this.checked})};
-document.getElementById("__mb_ol_tj").onchange=function(){_api("POST","/api/opt/toggle",{key:"deferJS",val:this.checked})};
-document.getElementById("__mb_ol_tt").onchange=function(){_api("POST","/api/opt/toggle",{key:"blockTrackers",val:this.checked})};
-document.getElementById("__mb_ol_tc").onchange=function(){_api("POST","/api/opt/toggle",{key:"smartCache",val:this.checked})};
-document.getElementById("__mb_ol_opt").onclick=function(){_api("POST","/api/opt/run").then(function(){_olRefresh()})};
-document.getElementById("__mb_ol_snap").onclick=function(){_api("GET","/api/snapshot").then(function(d){if(d&&d.result)document.getElementById("__mb_ol_s").textContent=d.result.length+"n"})};
-function _olRefresh(){_api("GET","/api/opt/metrics").then(function(d){if(d&&d.metrics){var m=d.metrics;document.getElementById("__mb_ol_s").textContent=m.score||"-";document.getElementById("__mb_ol_l").textContent=m.loadTimeMs?Math.round(m.loadTimeMs):"-";document.getElementById("__mb_ol_r2").textContent=m.requestCount||"-"}})}
-document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.shiftKey&&e.code==="KeyL"){e.preventDefault();_ov.classList.contains("show")?_olHide():_olShow()}});
+if(window.__mbSearch)return;window.__mbSearch=true;
+var s=document.createElement('style');
+s.textContent='#__mb_sbar{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,0.6);display:flex;align-items:flex-start;justify-content:center;padding-top:80px;font-family:Segoe UI,sans-serif;opacity:0;pointer-events:none;transition:opacity 0.15s}'+
+'#__mb_sbar.show{opacity:1;pointer-events:auto}'+
+'#__mb_sbar_inner{background:#1e1e1e;border:1px solid #444;border-radius:12px;padding:16px;width:500px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,0.5)}'+
+'#__mb_sbar_inner input{width:100%;padding:12px;background:#2d2d2d;border:1px solid #555;border-radius:8px;color:#fff;font-size:16px;outline:none;box-sizing:border-box}'+
+'#__mb_sbar_inner input:focus{border-color:#4fc3f7}'+
+'#__mb_sbar_inner input::placeholder{color:#777}'+
+'#__mb_sbar_inner .hint{color:#888;font-size:11px;margin-top:8px;text-align:center}';
+document.head.appendChild(s);
+var d=document.createElement('div');d.id='__mb_sbar';
+d.innerHTML='<div id="__mb_sbar_inner"><input id="__mb_sbar_inp" placeholder="Search Google..."><div class="hint">Ctrl+Shift+L to open</div></div>';
+document.body.appendChild(d);
+var inp=document.getElementById('__mb_sbar_inp');
+inp.onkeydown=function(e){if(e.key=="Enter"){var v=this.value.trim();if(v){window.goNavigate("https://www.google.com/search?q="+encodeURIComponent(v));d.classList.remove('show')}}};
+d.onclick=function(e){if(e.target===d)d.classList.remove('show')};
+document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.shiftKey&&e.code==="KeyL"){e.preventDefault();d.classList.toggle('show');if(d.classList.contains('show'))setTimeout(function(){inp.focus();inp.select()},100)}});
 })();`
 
 // minimized toolbar JS (~1KB)
@@ -407,8 +365,6 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/opt/profile", b.handleOptimizerProfile)
 	mux.HandleFunc("/api/opt/run", b.handleOptimizerRunAll)
 	mux.HandleFunc("/api/opt/tune", b.handleOptimizerTune)
-	mux.HandleFunc("/api/opt/toggle", b.handleOptimizerToggle)
-
 	// PVDS endpoints
 	mux.HandleFunc("/api/vd/snapshot", b.handleVDSnapshot)
 	mux.HandleFunc("/api/vd/optimize", b.handleVDOptimize)

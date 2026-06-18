@@ -1057,49 +1057,6 @@ func (b *browser) handleOptimizerTune(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (b *browser) handleOptimizerToggle(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		writeError(w, 405, "POST required")
-		return
-	}
-	var body struct {
-		Key string      `json:"key"`
-		Val interface{} `json:"val"`
-	}
-	json.NewDecoder(r.Body).Decode(&body)
-	on := false
-	if v, ok := body.Val.(bool); ok {
-		on = v
-	}
-	switch body.Key {
-	case "lazyImages":
-		if on {
-			b.syncExec(mediaInject)
-		} else {
-			b.syncExec(`window.__mbMediaOpt=false;var _=document.querySelectorAll('img[loading=lazy]');for(var i=0;i<_.length;i++)_.item(i).removeAttribute('loading')`)
-		}
-	case "deferJS":
-		if on {
-			b.syncExec(jsDeferInject)
-		} else {
-			b.syncExec(`window.__mbJSDone=false`)
-		}
-	case "blockTrackers":
-		if on {
-			b.syncExec(networkThrottleJS)
-		} else {
-			b.syncExec(`window.fetch=window.__origFetch||window.fetch`)
-		}
-	case "smartCache":
-		if on {
-			b.syncExec(cacheInjectJS)
-		} else {
-			b.syncExec(`window.__mbCacheDone=false`)
-		}
-	}
-	writeJSON(w, map[string]interface{}{"ok": true})
-}
-
 func (b *browser) handleOptimizerRunAll(w http.ResponseWriter, r *http.Request) {
 	if b.opt == nil {
 		writeError(w, 503, "optimizer not initialized")
