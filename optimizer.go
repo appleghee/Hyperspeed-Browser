@@ -31,6 +31,7 @@ type Optimizer struct {
 	netq       *NetworkQueue
 	cache      *SmartCache
 	tuner      *AutoTuner
+	vd         *ValueDensityEngine
 }
 
 type OptimizerProfile struct {
@@ -173,6 +174,7 @@ func NewOptimizer(b *browser) *Optimizer {
 		netq:       NewNetworkQueue(b),
 		cache:      NewSmartCache(defaultProfile.CacheMaxEntries, defaultProfile.CacheTTLMs),
 		tuner:      NewAutoTuner(b),
+		vd:         NewValueDensityEngine(b),
 	}
 	o.netq.maxConcurrent = defaultProfile.NetworkMaxConcurrent
 	return o

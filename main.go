@@ -343,6 +343,10 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/opt/run", b.handleOptimizerRunAll)
 	mux.HandleFunc("/api/opt/tune", b.handleOptimizerTune)
 
+	// PVDS endpoints
+	mux.HandleFunc("/api/vd/snapshot", b.handleVDSnapshot)
+	mux.HandleFunc("/api/vd/optimize", b.handleVDOptimize)
+
 	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
 }

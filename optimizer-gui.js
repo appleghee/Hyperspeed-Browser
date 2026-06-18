@@ -68,6 +68,11 @@
     '<label class="opt-tg" style="margin-left:auto"><input type="checkbox" id="__mb_script_auto"><span class="opt-tgs"></span></label>' +
     '<span class="opt-lbl" style="font-size:9px">Auto</span></div>' +
     '<span class="opt-hint">Ctrl+Shift+R to run script</span></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:5px"><div class="opt-gl">PVDS Value Density</div>' +
+    '<div class="opt-stat"><div><b id="__mb_vd_avg">-</b><s>Avg VD</s></div><div><b id="__mb_vd_hi">-</b><s>High</s></div><div><b id="__mb_vd_lo">-</b><s>Low</s></div></div>' +
+    '<div class="opt-stat" style="margin-top:2px"><div><b id="__mb_vd_mem">-</b><s>Mem MB</s></div><div><b id="__mb_vd_bud">-</b><s>Budget</s></div><div><b id="__mb_vd_frz">-</b><s>Frozen</s></div></div>' +
+    '<div class="opt-act"><button class="opt-btn opt-btn-s2" id="__mb_vd_scan">\u25b6 Scan</button>' +
+    '<button class="opt-btn opt-btn-s" id="__mb_vd_opt">\u26a1 Schedule</button></div></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -135,6 +140,7 @@
           m.requestCount || "-";
       }
     });
+    vdScan();
   }
   document.getElementById("__mb_opt_m").onclick = rs;
   document.getElementById("__mb_opt_x").onclick = function () {
@@ -180,6 +186,26 @@
       }
     }
   }
+  function vdScan() {
+    api("GET", "/api/vd/snapshot").then(function (d) {
+      if (d && d.stats) {
+        var s = d.stats;
+        document.getElementById("__mb_vd_avg").textContent = s.avgVD;
+        document.getElementById("__mb_vd_hi").textContent = s.highValue;
+        document.getElementById("__mb_vd_lo").textContent = s.lowValue;
+        document.getElementById("__mb_vd_mem").textContent =
+          s.usedMB + " / " + s.budgetMB;
+        document.getElementById("__mb_vd_frz").textContent = s.freezeZones;
+      }
+    });
+  }
+  function vdOpt() {
+    api("POST", "/api/vd/optimize").then(function (d) {
+      if (d && d.stats) vdScan();
+    });
+  }
+  document.getElementById("__mb_vd_scan").onclick = vdScan;
+  document.getElementById("__mb_vd_opt").onclick = vdOpt;
   document.getElementById("__mb_script_save").onclick = saveScript;
   window.__mbRunCustomScript = runScript;
   bg("balanced");
