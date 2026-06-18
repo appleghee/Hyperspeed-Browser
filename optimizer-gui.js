@@ -25,16 +25,20 @@
     ".opt-act{display:flex;gap:4px;flex-wrap:wrap}" +
     ".opt-btn{padding:5px 10px;border-radius:6px;border:none;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit;white-space:nowrap}" +
     ".opt-btn-p{background:#4fc3f7;color:#000}.opt-btn-s{background:rgba(255,255,255,0.08);color:#bbb}" +
+    ".opt-btn-s2{background:rgba(79,195,247,0.15);color:#4fc3f7}" +
     ".opt-stat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;text-align:center}" +
     ".opt-stat div{padding:5px 2px;background:rgba(255,255,255,0.03);border-radius:5px}" +
     ".opt-stat b{display:block;font-size:14px;color:#4fc3f7}.opt-stat s{font-size:8px;color:#888}" +
     ".opt-badge{font-size:8px;padding:1px 5px;border-radius:7px;font-weight:600}" +
-    ".opt-bd-green{background:rgba(102,187,106,0.2);color:#66bb6a}.opt-bd-yellow{background:rgba(255,167,38,0.2);color:#ffa726}.opt-bd-red{background:rgba(239,83,80,0.2);color:#ef5350}";
+    ".opt-bd-green{background:rgba(102,187,106,0.2);color:#66bb6a}.opt-bd-yellow{background:rgba(255,167,38,0.2);color:#ffa726}.opt-bd-red{background:rgba(239,83,80,0.2);color:#ef5350}" +
+    ".opt-ta{width:100%;height:60px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#ccc;font-family:monospace;font-size:10px;padding:5px;resize:vertical;outline:none}" +
+    ".opt-ta:focus{border-color:#4fc3f7}" +
+    ".opt-hint{font-size:8px;color:#666;margin-top:1px}";
   document.head.appendChild(s);
   var p = document.createElement("div");
   p.id = "__mb_opt_wrap";
   p.innerHTML =
-    '<button id="__mb_opt_btn">\u2699</button>' +
+    '<button id="__mb_opt_btn" title="Optimizer (Ctrl+Shift+Space)">\u2699</button>' +
     '<div id="__mb_opt_panel">' +
     '<div class="opt-h"><div class="opt-hl"><s>\u2699</s>Optimizer</div><span id="__mb_opt_badge" class="opt-badge opt-bd-green">Balanced</span></div>' +
     '<div class="opt-b">' +
@@ -57,6 +61,13 @@
     '<div class="opt-row"><span class="opt-lbl">Defer JS</span><label class="opt-tg"><input type="checkbox" checked id="__mb_t_j"><span class="opt-tgs"></span></label></div>' +
     '<div class="opt-row"><span class="opt-lbl">Block trackers</span><label class="opt-tg"><input type="checkbox" checked id="__mb_t_t"><span class="opt-tgs"></span></label></div>' +
     '<div class="opt-row"><span class="opt-lbl">Smart cache</span><label class="opt-tg"><input type="checkbox" checked id="__mb_t_c"><span class="opt-tgs"></span></label></div>' +
+    '<div class="opt-g"><div class="opt-gl">Custom Script</div>' +
+    '<textarea id="__mb_script_ta" class="opt-ta" placeholder="Paste JS here..."></textarea>' +
+    '<div class="opt-act" style="margin-top:3px">' +
+    '<button class="opt-btn opt-btn-s2" id="__mb_script_save">\u2714 Save</button>' +
+    '<label class="opt-tg" style="margin-left:auto"><input type="checkbox" id="__mb_script_auto"><span class="opt-tgs"></span></label>' +
+    '<span class="opt-lbl" style="font-size:9px">Auto</span></div>' +
+    '<span class="opt-hint">Ctrl+Shift+R to run script</span></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -69,18 +80,28 @@
     })
       .then(function (r) {
         return r.json();
-      })
-      ["catch"](function () {
+      })["catch"](function () {
         return null;
       });
   }
   var btn = document.getElementById("__mb_opt_btn"),
     panel = document.getElementById("__mb_opt_panel");
-  btn.onclick = function () {
+  function togglePanel() {
     panel.classList.toggle("show");
     btn.classList.toggle("active");
     if (panel.classList.contains("show")) rs();
-  };
+  }
+  btn.onclick = togglePanel;
+  document.addEventListener("keydown", function (e) {
+    if (e.ctrlKey && e.shiftKey && e.code === "Space") {
+      e.preventDefault();
+      togglePanel();
+    }
+    if (e.ctrlKey && e.shiftKey && e.code === "KeyR") {
+      e.preventDefault();
+      runScript();
+    }
+  });
   var md = document.getElementById("__mb_opt_mode");
   md.onchange = function () {
     var v = md.value;
@@ -132,6 +153,88 @@
     var el = document.getElementById("__mb_t_" + k);
     if (el) el.onchange = function () {};
   });
+  var ta = document.getElementById("__mb_script_ta");
+  var autoCb = document.getElementById("__mb_script_auto");
+  try {
+    var saved = JSON.parse(localStorage.getItem("__mb_customScript") || "{}");
+    if (saved.code) ta.value = saved.code;
+    if (saved.auto) autoCb.checked = saved.auto;
+  } catch (e) {}
+  function saveScript() {
+    var code = ta.value.trim();
+    var auto = autoCb.checked;
+    try {
+      localStorage.setItem(
+        "__mb_customScript",
+        JSON.stringify({ code: code, auto: auto })
+      );
+    } catch (e) {}
+  }
+  function runScript() {
+    var code = ta.value.trim();
+    if (code) {
+      try {
+        new Function(code)();
+      } catch (e) {
+        console.error("[CustomScript]", e);
+      }
+    }
+  }
+  document.getElementById("__mb_script_save").onclick = saveScript;
+  window.__mbRunCustomScript = runScript;
   bg("balanced");
   window.__mbOptGUI = true;
+})();
+(function () {
+  if (window.__mbScriptWatcher) return;
+  window.__mbScriptWatcher = true;
+  try {
+    var saved = JSON.parse(localStorage.getItem("__mb_customScript") || "{}");
+    if (saved.code && saved.auto) {
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+          try {
+            new Function(saved.code)();
+          } catch (e) {
+            console.error("[CustomScript]", e);
+          }
+        });
+      } else {
+        try {
+          new Function(saved.code)();
+        } catch (e) {
+          console.error("[CustomScript]", e);
+        }
+      }
+    }
+  } catch (e) {}
+  var _pushState = history.pushState;
+  history.pushState = function () {
+    _pushState.apply(this, arguments);
+    window.__mbRunScriptNav && window.__mbRunScriptNav();
+  };
+  var _replaceState = history.replaceState;
+  history.replaceState = function () {
+    _replaceState.apply(this, arguments);
+    window.__mbRunScriptNav && window.__mbRunScriptNav();
+  };
+  window.addEventListener("popstate", function () {
+    window.__mbRunScriptNav && window.__mbRunScriptNav();
+  });
+  window.__mbRunScriptNav = function () {
+    try {
+      var saved = JSON.parse(
+        localStorage.getItem("__mb_customScript") || "{}"
+      );
+      if (saved.code && saved.auto) {
+        setTimeout(function () {
+          try {
+            new Function(saved.code)();
+          } catch (e) {
+            console.error("[CustomScript]", e);
+          }
+        }, 500);
+      }
+    } catch (e) {}
+  };
 })();
