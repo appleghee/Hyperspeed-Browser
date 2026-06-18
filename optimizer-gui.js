@@ -89,6 +89,13 @@
     '<div class="opt-act"><button class="opt-btn opt-btn-p" id="__mb_rhd_start">\u25b6 Start</button>' +
     '<button class="opt-btn opt-btn-s" id="__mb_pvc_start">\u25b6 PVC</button>' +
     '<button class="opt-btn opt-btn-s" id="__mb_rhd_st">\u2139</button></div></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:5px"><div class="opt-gl">\u26a1 EHS Scheduler</div>' +
+    '<div class="opt-stat"><div><b id="__mb_ehs_h">-</b><s>Hot</s></div><div><b id="__mb_ehs_w">-</b><s>Warm</s></div><div><b id="__mb_ehs_c">-</b><s>Cold</s></div></div>' +
+    '<div class="opt-stat" style="margin-top:2px"><div><b id="__mb_ehs_d">-</b><s>Dormant</s></div><div><b id="__mb_ehs_s">-</b><s>Split</s></div><div><b id="__mb_ehs_t">-</b><s>Total</s></div></div>' +
+    '<div class="opt-act"><button class="opt-btn opt-btn-p" id="__mb_ehs_start">\u25b6 EHS</button>' +
+    '<button class="opt-btn opt-btn-s" id="__mb_ehs_st">\u2139</button></div></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:4px"><div class="opt-gl" style="color:#ffa726">\u2728 Easter Eggs</div>' +
+    '<span style="font-size:9px;color:#888;display:block;padding:2px 0">Konami code \u2192 rainbow panel | type "opencode"</span></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -288,6 +295,23 @@
   document.getElementById("__mb_pvc_start").onclick = function() {
     api("POST", "/api/pvc/start").then(function(d) { if(d && d.ok) rhdStats(); });
   };
+  function ehsStats() {
+    api("GET", "/api/ehs/stats").then(function (d) {
+      if (d && d.stats) {
+        var s = d.stats;
+        document.getElementById("__mb_ehs_h").textContent = s.hot;
+        document.getElementById("__mb_ehs_w").textContent = s.warm;
+        document.getElementById("__mb_ehs_c").textContent = s.cold;
+        document.getElementById("__mb_ehs_d").textContent = s.dormant;
+        document.getElementById("__mb_ehs_s").textContent = s.splits;
+        document.getElementById("__mb_ehs_t").textContent = s.total;
+      }
+    });
+  }
+  document.getElementById("__mb_ehs_start").onclick = function() {
+    api("POST", "/api/ehs/start").then(function(d) { if(d && d.ok) { ehsStats(); } });
+  };
+  document.getElementById("__mb_ehs_st").onclick = ehsStats;
   document.getElementById("__mb_rhd_st").onclick = rhdStats;
   document.getElementById("__mb_q_inj").onclick = qInject;
   document.getElementById("__mb_q_st").onclick = qStats;
@@ -299,7 +323,7 @@
   window.__mbRunCustomScript = runScript;
   bg("balanced");
   qInject(); rhdStats();
-  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start");
+  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start"); api("POST", "/api/ehs/start");
   window.__mbOptGUI = true;
 })();
 (function () {
