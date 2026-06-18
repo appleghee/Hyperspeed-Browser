@@ -37,6 +37,7 @@ type Optimizer struct {
 	rhd        *RHDGCEngine
 	pvc        *PVCEngine
 	ehs        *EHSEngine
+	rpc        *RPCEngine
 }
 
 type OptimizerProfile struct {
@@ -185,6 +186,7 @@ func NewOptimizer(b *browser) *Optimizer {
 		rhd:        NewRHDGCEngine(b),
 		pvc:        NewPVCEngine(b),
 		ehs:        NewEHSEngine(b),
+		rpc:        NewRPCEngine(b),
 	}
 	o.netq.maxConcurrent = defaultProfile.NetworkMaxConcurrent
 	return o

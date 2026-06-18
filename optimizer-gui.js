@@ -96,6 +96,10 @@
     '<button class="opt-btn opt-btn-s" id="__mb_ehs_st">\u2139</button></div></div>' +
     '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:4px"><div class="opt-gl" style="color:#ffa726">\u2728 Easter Eggs</div>' +
     '<span style="font-size:9px;color:#888;display:block;padding:2px 0">Konami code \u2192 rainbow panel | type "opencode"</span></div>' +
+    '<div class="opt-g" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:5px"><div class="opt-gl">\u26a1 RPC Cache</div>' +
+    '<div class="opt-stat"><div><b id="__mb_rpc_e">-</b><s>Entries</s></div><div><b id="__mb_rpc_h">-</b><s>HitRate</s></div><div><b id="__mb_rpc_g">-</b><s>Genomes</s></div></div>' +
+    '<div class="opt-act"><button class="opt-btn opt-btn-p" id="__mb_rpc_start">\u25b6 RPC</button>' +
+    '<button class="opt-btn opt-btn-s" id="__mb_rpc_st">\u2139 Stats</button></div></div>' +
     "</div></div></div>";
   document.body.appendChild(p);
   var port = window.__mbPort || 0;
@@ -311,6 +315,20 @@
   document.getElementById("__mb_ehs_start").onclick = function() {
     api("POST", "/api/ehs/start").then(function(d) { if(d && d.ok) { ehsStats(); } });
   };
+  function rpcStats() {
+    api("GET", "/api/rpc/stats").then(function (d) {
+      if (d && d.stats) {
+        var s = d.stats;
+        document.getElementById("__mb_rpc_e").textContent = s.entries;
+        document.getElementById("__mb_rpc_h").textContent = s.hitRate;
+        document.getElementById("__mb_rpc_g").textContent = s.genomes;
+      }
+    });
+  }
+  document.getElementById("__mb_rpc_start").onclick = function() {
+    api("POST", "/api/rpc/start").then(function(d) { if(d && d.ok) rpcStats(); });
+  };
+  document.getElementById("__mb_rpc_st").onclick = rpcStats;
   document.getElementById("__mb_ehs_st").onclick = ehsStats;
   document.getElementById("__mb_rhd_st").onclick = rhdStats;
   document.getElementById("__mb_q_inj").onclick = qInject;
@@ -323,7 +341,7 @@
   window.__mbRunCustomScript = runScript;
   bg("balanced");
   qInject(); rhdStats();
-  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start"); api("POST", "/api/ehs/start");
+  api("POST", "/api/rhd/start"); api("POST", "/api/pvc/start"); api("POST", "/api/ehs/start"); api("POST", "/api/rpc/start");
   window.__mbOptGUI = true;
 })();
 (function () {

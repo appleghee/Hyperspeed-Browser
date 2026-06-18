@@ -367,6 +367,10 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/ehs/start", b.handleEHSStart)
 	mux.HandleFunc("/api/ehs/stats", b.handleEHSStats)
 
+	// RPC endpoints
+	mux.HandleFunc("/api/rpc/start", b.handleRPCStart)
+	mux.HandleFunc("/api/rpc/stats", b.handleRPCStats)
+
 	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
 	b.srv.Serve(listener)
 }
