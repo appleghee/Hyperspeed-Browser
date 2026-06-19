@@ -287,7 +287,6 @@ if(scripts>25)score-=5;
 if(nodes>2000)score-=10;
 if(errs>0)score-=errs*3;
 if(score<10)score=10;
-}
 var m={
 loadTimeMs:(t.loadEventEnd-t.navigationStart)||0,
 domReadyMs:(t.domContentLoadedEventEnd-t.navigationStart)||0,
@@ -304,7 +303,8 @@ domNodeCount:nodes,
 score:Math.max(10,Math.min(100,score))
 };
 window.__lastMetrics=m;
-return m;`
+return m;
+})()`
 
 func NewMetricsCollector(b *browser) *MetricsCollector {
 	return &MetricsCollector{b: b, history: make([]PageMetrics, 0, 50)}
