@@ -5,8 +5,9 @@ enabled:true,uid:0,levels:{},rects:{},saved:{},inflates:0,cvCount:0,
 INTERACTIVE:'a,button,input,select,textarea,audio,video,canvas,[tabindex],[contenteditable],[role=button],[role=link],[role=tab],[onclick],[onmousedown]',
 init:function(){
 var T=this;
-var all=document.querySelectorAll('body *');
-for(var i=0;i<all.length;i++)T._add(all[i]);
+ var all=document.querySelectorAll('body *');
+ if(all.length>3000)all=Array.prototype.slice.call(all,0,3000);
+ for(var i=0;i<all.length;i++)T._add(all[i]);
 T.io=new IntersectionObserver(function(es){es.forEach(function(e){T._see(e)})},{rootMargin:'3000px'});
 T.mo=new MutationObserver(function(muts){
 for(var m=0;m<muts.length;m++){

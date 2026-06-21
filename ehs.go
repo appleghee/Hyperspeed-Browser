@@ -111,18 +111,17 @@ H._add(function(){return origFn.apply(this,arguments);},0,'user',heat);
 }
 };
 var _st=setTimeout;
-setTimeout=function(cb,ms){
-if(typeof cb==='function'){
-var src=(new Error()).stack||'';
-var heat=50;
-if(src.match(/Analytics|analytics|tracker|ga|gtag|fbq|ads|advert/i))heat=5;
-else if(src.match(/onclick|addEventListener|onkey|onscroll|ontouch|onmouse|\.click|\.key|\.scroll/i))heat=200;
-else if(src.match(/rAF|requestAnimationFrame|animate|raf/i))heat=100;
-var wrapper=function(){try{cb();}catch(ex){}};
-H._add(wrapper,ms||0,src,heat);
-return _st(wrapper,ms);}
-return _st(cb,ms);
-};
+ setTimeout=function(cb,ms){
+ if(typeof cb==='function'){
+ var heat=50;
+ if(!ms||ms<=16)heat=100;
+ else if(ms>1000)heat=5;
+ else heat=Math.max(5,Math.min(200,200-ms*0.15));
+ var wrapper=function(){try{cb();}catch(ex){}};
+ H._add(wrapper,ms||0,'timeout',heat);
+ return _st(wrapper,ms);}
+ return _st(cb,ms);
+ };
 var _si=setInterval;
 setInterval=function(cb,ms){
 if(typeof cb==='function'){

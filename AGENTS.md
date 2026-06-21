@@ -3,13 +3,16 @@
 ## Build & Run
 
 ```powershell
-$env:CGO_ENABLED=1; $env:CC="gcc"
-go build -ldflags="-s -w -H=windowsgui" -o hyperspeed-browser.exe .
+# Release build (recommended)
+.\build.ps1
+
+# Development build (console window, no stripping)
+.\build.ps1 -Mode dev
 ```
 
 Windows-only. Requires **MinGW-w64** (`C:\mingw64\bin\gcc`) + **WebView2 Runtime** (Windows 11 includes it).
 
-No tests, no linter, no formatter config in repo. `go vet` and `go build` are the only verification steps.
+No tests, no linter configured in repo. `go vet` and `go build` are the verification steps.
 
 ## Architecture
 
@@ -19,9 +22,9 @@ Data flow: `main()` → `browser{WebView}` → bind Go↔JS (`w.Bind`) → start
 
 ## JS Injection Conventions
 
-Bootstrap JS merged into one `w.Init(...)` call at `main.go:206`. Inline `const` strings are the convention.
+Bootstrap JS merged into one `w.Init(...)` call at `main.go:218`. Inline `const` strings are the convention.
 
-Post-load JS goes through `b.w.Dispatch(func() { b.w.Eval(...) })` (see `injectTurboLoop` at `main.go:329`). Guard with `window.__mbXxx` flags.
+Post-load JS goes through `b.w.Dispatch(func() { b.w.Eval(...) })` (see `injectTurboLoop` at `main.go:341`). Guard with `window.__mbXxx` flags.
 
 ## Sync Eval
 

@@ -1,0 +1,16 @@
+linters:
+  enable:
+    - gofmt
+    - govet
+    - staticcheck
+    - misspell
+    - unconvert
+issues:
+  exclude-rules:
+    - path: extra_engines\.go
+      text: "duplicate"
+    - path: _test\.go
+      linters:
+        - errcheck
+run:
+  timeout: 3m

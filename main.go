@@ -89,7 +89,8 @@ const runtimeJS = `(function(){
 if(window.__mbHooks)return;
 window.__mbHooks=true;
 var L=[],WL=[],SL=[];
-window.__networkLog=L;window.__wsLog=WL;window.__sseLog=SL;
+ window.__networkLog=L;window.__wsLog=WL;window.__sseLog=SL;
+ window.__mbNetworkMax=500;
 window.__origFetch=window.fetch;window.__origXHR=XMLHttpRequest;window.__origWS=WebSocket;window.__origES=EventSource;
 var _f=window.fetch,_X=XMLHttpRequest,_W=WebSocket,_E=EventSource;
 function tr(s,m){return s&&typeof s=='string'?s.length<=m?s:s.slice(0,m)+' [truncated]':s}
@@ -97,9 +98,9 @@ function rl(r,p){r.status=p.status;r.statusText=p.statusText;r.endTime=Date.now(
 r.responseHeaders={};p.headers.forEach(function(v,k){r.responseHeaders[k]=v});
 var ct=r.contentType;if(ct&&ct.match(/json|text|html|xml|javascript/)){
 var c=p.clone();c.text().then(function(t){r.responseBody=tr(t,10240);r.bodyLength=t.length})['catch'](function(){r.responseBody='[body read failed]'})}}
-window.fetch=function(u,o){var r={url:(typeof u=='string'?u:(u&&u.url)||''),method:(o&&o.method)||'GET',requestBody:(o&&o.body)?String(o.body):null,type:'fetch',startTime:Date.now()};L.push(r);
+window.fetch=function(u,o){var r={url:(typeof u=='string'?u:(u&&u.url)||''),method:(o&&o.method)||'GET',requestBody:(o&&o.body)?String(o.body):null,type:'fetch',startTime:Date.now()};L.length<500&&L.push(r);
 return _f.call(this,u,o).then(function(p){rl(r,p);return p})['catch'](function(e){r.error=e.message;r.endTime=Date.now();throw e})};
-window.XMLHttpRequest=function(){var x=new _X(),r={type:'xhr',startTime:Date.now()};L.push(r);
+window.XMLHttpRequest=function(){var x=new _X(),r={type:'xhr',startTime:Date.now()};L.length<500&&L.push(r);
 var o=x.open.bind(x);x.open=function(){r.method=arguments[0];r.url=arguments[1];return o.apply(x,arguments)};
 var s=x.send.bind(x);x.send=function(b){r.requestBody=b?String(b):null;r.startTime=Date.now();
 x.addEventListener('readystatechange',function(){if(x.readyState==4){

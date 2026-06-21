@@ -12,3 +12,8 @@
 tmp/
 token-optimizer/
 bench.exe
+*.port
+__debug_bin
+vendor/
+*.log
+hyperspeed-browser-dev.exe
