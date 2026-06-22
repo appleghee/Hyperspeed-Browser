@@ -59,7 +59,7 @@ func (a *AutoTuneUHE) Stop() {
 }
 
 func (a *AutoTuneUHE) tuneLoop() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -96,6 +96,30 @@ func (a *AutoTuneUHE) RecordMetrics(domain string, cpu, mem, net float64) {
 func (a *AutoTuneUHE) analyze() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	// Evict profiles not seen in 1 hour
+	cutoff := time.Now().Add(-1 * time.Hour)
+	for domain, p := range a.profilesByDomain {
+		if p.LastUpdate.Before(cutoff) {
+			delete(a.profilesByDomain, domain)
+		}
+	}
+
+	// Cap at 200 domains
+	const maxProfiles = 200
+	if len(a.profilesByDomain) > maxProfiles {
+		var oldest string
+		var oldestTime time.Time
+		first := true
+		for d, p := range a.profilesByDomain {
+			if first || p.LastUpdate.Before(oldestTime) {
+				oldest = d
+				oldestTime = p.LastUpdate
+				first = false
+			}
+		}
+		delete(a.profilesByDomain, oldest)
+	}
 
 	// Analyze each domain profile
 	for domain, p := range a.profilesByDomain {

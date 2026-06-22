@@ -106,7 +106,11 @@ func (q *QSEEngine) GatherClickHeat() {
 	if err := q.b.syncUnwrapInto("(function(){var q=window.__mbQSE;if(!q)return{};try{return q.clicks;}catch(e){return{};};})()", 5*time.Second, &clicks); err != nil {
 		return
 	}
+	// Cap at 500 domains — evict latest merged entries if full
 	for d, c := range clicks {
+		if len(q.clickHeat) >= 500 {
+			break
+		}
 		q.clickHeat[d] = c
 	}
 }
@@ -166,6 +170,12 @@ func (b *browser) handleQSEAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b.opt.qse.mu.Lock()
+	if len(b.opt.qse.shortcuts) >= 100 {
+		for k := range b.opt.qse.shortcuts {
+			delete(b.opt.qse.shortcuts, k)
+			break
+		}
+	}
 	b.opt.qse.shortcuts[req.Key] = req.URL
 	b.opt.qse.mu.Unlock()
 	writeJSON(w, map[string]interface{}{"ok": true, "shortcuts": len(b.opt.qse.shortcuts)})

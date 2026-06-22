@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -57,31 +58,41 @@ document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.shiftKey&&e.code
 document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.shiftKey&&e.code==="KeyH"){e.preventDefault();if(typeof window.goNavigate==='function'){window.goNavigate('hyperspeed://console')}else{var b=window.__mbBase||'http://127.0.0.1:'+(window.__mbPort||6969);fetch(b+'/api/navigate',{method:'POST',headers:{'Content-Type':'application/json','X-API-Token':window.__mbToken||''},body:'{"url":"hyperspeed://console"}'})['catch'](function(){})}}},true);
 })();`
 
-// minimized toolbar JS (~1KB)
-const toolbarJS = `(function(){
+// Navigation bar — always-visible, real navigation (Back, Forward, Reload, URL input)
+// Navigation bar — always-visible, real navigation (Back, Forward, Reload, URL input)
+const navBarJS = `(function(){
+if(document.getElementById('__mb_nav'))return;
 var s=document.createElement('style');
-s.textContent='#__mb_bar{position:fixed;top:0;left:0;right:0;height:32px;z-index:2147483647;background:#1e1e1e;display:flex;align-items:center;padding:4px 8px;font-family:Segoe UI,sans-serif;box-shadow:0 2px 4px rgba(0,0,0,.5);box-sizing:border-box;gap:4px;border-bottom:1px solid #333;pointer-events:auto}'+
-'#__mb_bar button{background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;width:28px;height:24px;border-radius:3px}'+
-'#__mb_bar button:hover{background:rgba(255,255,255,0.1)}'+
-'#__mb_bar input{flex:1;height:24px;padding:0 8px;background:#2d2d2d;border:1px solid #444;border-radius:3px;color:#ddd;font-size:13px;outline:none;min-width:0}';
+s.textContent='#__mb_nav{position:fixed;top:0;left:0;right:0;height:36px;z-index:2147483647;background:#1a1a2e;display:flex;align-items:center;padding:2px 4px;font-family:"Segoe UI",sans-serif;box-shadow:0 1px 6px rgba(0,0,0,.7);box-sizing:border-box;gap:2px;border-bottom:1px solid #333}'+
+'#__mb_nav button{background:transparent;border:none;color:#ccc;font-size:15px;cursor:pointer;width:30px;height:28px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center}'+
+'#__mb_nav button:hover{background:rgba(255,255,255,0.1);color:#fff}'+
+'#__mb_nav button:disabled{opacity:0.25;cursor:default}'+
+'#__mb_nav input{flex:1;height:26px;padding:0 10px;background:#16213e;border:1px solid #0f3460;border-radius:6px;color:#e0e0e0;font-size:13px;outline:none;min-width:0;margin:0 2px}'+
+'#__mb_nav input:focus{border-color:#4fc3f7}'+
+'#__mb_nav input::placeholder{color:#555}'+
+'body{padding-top:36px!important}';
 (document.head||document.documentElement).appendChild(s);
-var d=document.createElement('div');d.id='__mb_bar';
-d.innerHTML='<button id="__mb_b">\u2039</button><button id="__mb_f">\u203A</button><button id="__mb_r">\u21bb</button><button id="__mb_h" style="color:#58a6ff;font-weight:700;font-size:14px">\u2302</button><input id="__mb_u" placeholder="URL...">';
-function appendBar(){var b=document.body||document.documentElement;if(b){b.insertBefore(d,b.firstChild)}else{requestAnimationFrame(appendBar)}}
+var d=document.createElement('div');d.id='__mb_nav';
+d.innerHTML='<button id="__n_b" title="Back (Alt+Left)">\u25C0</button><button id="__n_f" title="Forward (Alt+Right)">\u25B6</button><button id="__n_r" title="Reload (Ctrl+R)">\u21BB</button><input id="__n_u" placeholder="Search or enter URL..."><button id="__n_h" style="font-size:14px;color:#4fc3f7">\u2302</button>';
+function appendBar(){var b=document.body||document.documentElement;if(b){b.insertBefore(d,b.firstChild);wireBar()}else{requestAnimationFrame(appendBar)}}
 appendBar();
-function gs(){try{var v=getNavState();return JSON.parse(v||'{}')}catch(e){return{}}}
-var o=new MutationObserver(function(){
-var u=document.getElementById('__mb_u'),b=document.getElementById('__mb_b'),f=document.getElementById('__mb_f'),r=document.getElementById('__mb_r'),h=document.getElementById('__mb_h');
-if(!u)return;
-o.disconnect();
-var s2=gs();
-u.onkeydown=function(e){if(e.key=='Enter'&&u.value.trim())window.goNavigate(u.value.trim())};u.value=location.href;
-if(b){b.disabled=!s2.b;b.onclick=function(){window.goBack()}}
-if(f){f.disabled=!s2.f;f.onclick=function(){window.goForward()}}
-if(r)r.onclick=function(){window.goReload()};
-if(h)h.onclick=function(){window.goNavigate('hyperspeed://console')};
+var u,b,f,r,h;function wireBar(){
+u=document.getElementById('__n_u');b=document.getElementById('__n_b');f=document.getElementById('__n_f');r=document.getElementById('__n_r');h=document.getElementById('__n_h');
+if(!u){setTimeout(wireBar,30);return}
+u.addEventListener('keydown',function(e){if(e.key=='Enter'){var v=this.value.trim();if(!v)return;if(v.indexOf('://')>0){window.goNavigate(v)}else{window.goNavigate('https://www.google.com/search?q='+encodeURIComponent(v))}this.blur()}});
+b.addEventListener('click',function(){if(!b.disabled)window.goBack()});
+f.addEventListener('click',function(){if(!f.disabled)window.goForward()});
+r.addEventListener('click',function(){window.goReload()});
+h.addEventListener('click',function(){window.goNavigate('hyperspeed://console')});
+var lu='';upd();setInterval(upd,300);
+function upd(){var c=location.href;if(c!='about:blank'&&c!==lu){lu=c;u.value=c}try{var ns=JSON.parse(window.getNavState()||'{}');b.disabled=!ns.b;f.disabled=!ns.f}catch(e){}}
+}
+document.addEventListener('keydown',function(e){
+if(e.ctrlKey&&e.code=='KeyL'){e.preventDefault();var i=document.getElementById('__n_u');if(i){i.focus();i.select()}}
+if(e.altKey&&e.code=='ArrowLeft'&&!e.ctrlKey){e.preventDefault();var x=document.getElementById('__n_b');if(x&&!x.disabled)window.goBack()}
+if(e.altKey&&e.code=='ArrowRight'&&!e.ctrlKey){e.preventDefault();var x=document.getElementById('__n_f');if(x&&!x.disabled)window.goForward()}
+if(e.ctrlKey&&e.code=='KeyR'&&!e.altKey&&!e.shiftKey&&!e.metaKey){e.preventDefault();window.goReload()}
 });
-o.observe(document.documentElement,{childList:true,subtree:true});
 })();`
 
 // runtime intercept JS - hooks fetch, XHR, WebSocket, EventSource for deep capture
@@ -94,6 +105,7 @@ var L=[],WL=[],SL=[];
 window.__origFetch=window.fetch;window.__origXHR=XMLHttpRequest;window.__origWS=WebSocket;window.__origES=EventSource;
 var _f=window.fetch,_X=XMLHttpRequest,_W=WebSocket,_E=EventSource;
 function tr(s,m){return s&&typeof s=='string'?s.length<=m?s:s.slice(0,m)+' [truncated]':s}
+function cap(a,n){while(a.length>n)a.shift()}
 function rl(r,p){r.status=p.status;r.statusText=p.statusText;r.endTime=Date.now();r.contentType=p.headers.get('content-type')||'';
 r.responseHeaders={};p.headers.forEach(function(v,k){r.responseHeaders[k]=v});
 var ct=r.contentType;if(ct&&ct.match(/json|text|html|xml|javascript/)){
@@ -107,15 +119,17 @@ x.addEventListener('readystatechange',function(){if(x.readyState==4){
 r.status=x.status;r.statusText=x.statusText;r.endTime=Date.now();r.contentType=x.getResponseHeader('content-type')||'';
 try{var t=x.responseText;if(t){r.responseBody=tr(t,10240);r.bodyLength=t.length}}catch(e){}}});
 return s(b)};return x};
-window.WebSocket=function(url,p){var ws=new _W(url,p),en={url:url,type:'websocket',messages:[],readyState:ws.readyState};WL.push(en);
-var s=ws.send.bind(ws);ws.send=function(d){en.messages.push({direction:'outgoing',payload:String(d),time:Date.now()});return s(d)};
+function mcap(m,lim){if(m.length>lim)m.splice(0,m.length-lim)}
+window.WebSocket=function(url,p){var ws=new _W(url,p),en={url:url,type:'websocket',messages:[],readyState:ws.readyState};WL.length<50&&WL.push(en);
+var s=ws.send.bind(ws);ws.send=function(d){mcap(en.messages,100);en.messages.push({direction:'outgoing',payload:String(d),time:Date.now()});return s(d)};
 ws.addEventListener('open',function(){en.readyState=ws.readyState});
-ws.addEventListener('message',function(e){en.messages.push({direction:'incoming',payload:String(e.data),time:Date.now()})});
+ws.addEventListener('message',function(e){mcap(en.messages,100);en.messages.push({direction:'incoming',payload:String(e.data),time:Date.now()})});
 ws.addEventListener('close',function(){en.readyState=ws.readyState});return ws};
-window.EventSource=function(url,c){var es=new _E(url,c),en={url:url,type:'eventsource',messages:[],readyState:es.readyState};SL.push(en);
+window.EventSource=function(url,c){var es=new _E(url,c),en={url:url,type:'eventsource',messages:[],readyState:es.readyState};SL.length<50&&SL.push(en);
 es.addEventListener('open',function(){en.readyState=es.readyState});
-es.addEventListener('message',function(e){en.messages.push({event:e.type,data:String(e.data),time:Date.now()})});
+es.addEventListener('message',function(e){mcap(en.messages,100);en.messages.push({event:e.type,data:String(e.data),time:Date.now()})});
 es.addEventListener('error',function(){en.readyState=es.readyState});return es};
+setInterval(function(){cap(L,500);cap(WL,50);cap(SL,50);for(var i=0;i<WL.length;i++)cap(WL[i].messages,100);for(var i=0;i<SL.length;i++)cap(SL[i].messages,100)},60000);
 try{!function(){
 window.__turboState='started';
 var B=['google-analytics.com','googletagmanager.com','googleadservices.com','pagead2.googlesyndication.com','doubleclick.net','adservice.google.com'];
@@ -127,6 +141,11 @@ var os=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k[0]
 window.__turboState='hooks ok'}();
 }catch(e){window.__turboErr=String(e)}
 })()`
+
+type benchPoint struct {
+	label string
+	t     time.Time
+}
 
 type browser struct {
 	w       webview.WebView
@@ -142,11 +161,44 @@ type browser struct {
 	browseHistory   []string
 	evalID   int
 	evalReqs map[int]chan string
+	evalPool sync.Pool
 	srv      *http.Server
 	portFile string
 
 	startHTML string
 	opt       *Optimizer
+
+	benchMu sync.Mutex
+	bench   []benchPoint
+}
+
+func (b *browser) benchLog(label string) {
+	b.benchMu.Lock()
+	b.bench = append(b.bench, benchPoint{label: label, t: time.Now()})
+	if len(b.bench) > 50 {
+		b.bench = b.bench[len(b.bench)-50:]
+	}
+	b.benchMu.Unlock()
+}
+
+func (b *browser) benchDump() {
+	b.benchMu.Lock()
+	pts := make([]benchPoint, len(b.bench))
+	copy(pts, b.bench)
+	b.benchMu.Unlock()
+	if len(pts) < 2 {
+		return
+	}
+	base := pts[0].t
+	log.Printf("[BENCH] === Benchmark (%d points) ===", len(pts))
+	for i, p := range pts {
+		fromStart := p.t.Sub(base).Milliseconds()
+		var gap string
+		if i > 0 {
+			gap = fmt.Sprintf(" gap=%dms", p.t.Sub(pts[i-1].t).Milliseconds())
+		}
+		log.Printf("[BENCH]   %s: +%dms%s", p.label, fromStart, gap)
+	}
 }
 
 func generateRandomToken() string {
@@ -156,6 +208,15 @@ func generateRandomToken() string {
 }
 
 func main() {
+	// Minimize WebView2 memory: per-site process + trim background services
+	os.Setenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+		"--process-per-site "+
+			"--disable-extensions --disable-sync --disable-background-networking "+
+			"--disable-component-extensions-with-background-pages "+
+			"--disable-features=TranslateUI,InterestFeedContentSuggestions,ChromeWhatsNewUI "+
+			"--disk-cache-size=10485760 --max-decoded-image-size-mb=50")
+	os.Setenv("WEBVIEW2_BROWSER_EXE_PATH", "")
+
 	w := webview.New(false)
 	defer w.Destroy()
 
@@ -168,6 +229,7 @@ func main() {
 		idx:      0,
 		curr:     startURL,
 		evalReqs: make(map[int]chan string),
+		evalPool: sync.Pool{New: func() interface{} { return make(chan string, 1) }},
 		apiToken: generateRandomToken(),
 	}
 
@@ -198,27 +260,35 @@ func main() {
 	app.opt.lod.Start()
 	app.opt.ehs.Start()
 	app.opt.rpc.Start()
-	app.opt.qse.Start()
 	app.opt.rhd.Start()
 	app.opt.pvc.Start()
-	app.opt.dna.Start()
-	app.opt.hbm.Start()
-	app.opt.avp.Start()
-	app.opt.domCompress.Start()
-	app.opt.pce.Start()
-	app.opt.upm.Start()
-	app.opt.dra.Start()
-	app.opt.mcs.Start()
-	app.opt.cbl.Start()
-	app.opt.uee.Start()
-	app.opt.hfs.Start()
-	app.opt.rcm.Start()
 	w.SetTitle(fmt.Sprintf("Hyperspeed Browser [:%d] Genesis", app.apiPort))
 
-	// Single Init call — all JS merged
-	w.Init(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;window.__mbBase='http://127.0.0.1:'+window.__mbPort;`, app.apiPort, app.apiToken) + overlayJS + toolbarJS + runtimeJS + popupBlockerJS + optimizerInitJS + optimizerGUIJS + lodJS)
+	// Single Init call — all JS merged (navBarJS runs on every document creation)
+	var initJS strings.Builder
+	initJS.WriteString(fmt.Sprintf(`window.__mbPort=%d;window.__mbToken=%q;window.__mbBase='http://127.0.0.1:'+window.__mbPort;`, app.apiPort, app.apiToken))
+	initJS.WriteString(overlayJS)
+	initJS.WriteString(runtimeJS)
+	initJS.WriteString(popupBlockerJS)
+	initJS.WriteString(optimizerInitJS)
+	initJS.WriteString(optimizerGUIJS)
+	initJS.WriteString(lodJS)
+	initJS.WriteString(navBarJS)
+	w.Init(initJS.String())
 	navTo(app, app.curr)
 	go app.injectTurboLoop()
+	go app.lazyStartEngines()
+	go func() {
+		for {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			log.Printf("[MEM] Alloc=%dMB Heap=%dMB Sys=%dMB Stack=%dMB Goroutines=%d WorkingSet≈%dMB",
+				m.Alloc/(1024*1024), m.HeapAlloc/(1024*1024), m.Sys/(1024*1024),
+				m.StackInuse/(1024*1024), runtime.NumGoroutine(),
+				(m.Alloc+m.Sys)/(1024*1024))
+			time.Sleep(30 * time.Second)
+		}
+	}()
 	w.Run()
 
 	app.stopAPI()
@@ -233,7 +303,8 @@ func must(err error) {
 // Injected via w.Eval after page loads (document.head exists then).
 const turboDOM = `if(document.head&&!window.__turbDOMDone){window.__turbDOMDone=true;
 var ka=function(){var e=document.querySelectorAll('[class*=ad-],[class*=banner],[id*=ad_],[id*=banner],.popup,.adsbygoogle');for(var i=0;i<e.length;i++){if(e[i]&&e[i].parentNode)e[i].remove()}};ka();
-(new MutationObserver(function(){ka()})).observe(document.body,{childList:true,subtree:true});
+var mo=new MutationObserver(function(){ka()});mo.observe(document.body,{childList:true,subtree:true});
+setTimeout(function(){mo.disconnect()},10000);
 window.__turboState='done';
 }`
 
@@ -379,6 +450,7 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/back", b.handleBack)
 	mux.HandleFunc("/api/forward", b.handleForward)
 	mux.HandleFunc("/api/reload", b.handleReload)
+	mux.HandleFunc("/api/bench", b.handleBench)
 
 	// inspection
 	mux.HandleFunc("/api/eval", b.handleEval)
@@ -499,7 +571,13 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	mux.HandleFunc("/api/hlrc/register", b.handleHLRCRegister)
 	mux.HandleFunc("/api/hlrc/config", b.handleHLRCConfig)
 
-	b.srv = &http.Server{Handler: corsMiddleware(authMiddleware(b, mux))}
+	b.srv = &http.Server{
+		Handler:      corsMiddleware(authMiddleware(b, mux)),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		MaxHeaderBytes: 1 << 16,
+	}
 	b.srv.Serve(listener)
 }
 
@@ -564,7 +642,7 @@ func (b *browser) evalCallback(id int, result string) {
 
 // syncEval eval JS and return JSON-stringified result.
 func (b *browser) syncEval(js string, timeout time.Duration) (string, error) {
-	ch := make(chan string, 1)
+	ch := b.evalPool.Get().(chan string)
 	b.mu.Lock()
 	id := b.evalID
 	b.evalID++
@@ -579,11 +657,13 @@ func (b *browser) syncEval(js string, timeout time.Duration) (string, error) {
 	}
 	select {
 	case result := <-ch:
+		b.evalPool.Put(ch)
 		return result, nil
 	case <-time.After(timeout):
 		b.mu.Lock()
 		delete(b.evalReqs, id)
 		b.mu.Unlock()
+		b.evalPool.Put(ch)
 		return "", fmt.Errorf("eval timeout after %v", timeout)
 	}
 }
@@ -983,6 +1063,26 @@ window.__mbHooks=false`)
 	writeJSON(w, map[string]interface{}{"ok": true})
 }
 
+func (b *browser) handleBench(w http.ResponseWriter, r *http.Request) {
+	b.benchMu.Lock()
+	pts := make([]benchPoint, len(b.bench))
+	copy(pts, b.bench)
+	b.benchMu.Unlock()
+
+	type benchEntry struct {
+		Label string `json:"label"`
+		Ms    int64  `json:"ms"`
+	}
+	var entries []benchEntry
+	for _, p := range pts {
+		entries = append(entries, benchEntry{
+			Label: p.label,
+			Ms:    p.t.UnixMilli(),
+		})
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "points": entries})
+}
+
 func (b *browser) handleInfo(w http.ResponseWriter, r *http.Request) {
 	_, err := b.syncEval("1", 5*time.Second)
 	pageReady := err == nil
@@ -1016,16 +1116,30 @@ func (b *browser) handleInfo(w http.ResponseWriter, r *http.Request) {
 // Navigation helpers
 
 func navTo(b *browser, urlStr string) {
+	b.benchLog("navTo start")
 	if urlStr == "hyperspeed://console" || urlStr == "" {
 		b.w.Navigate("data:text/html," + url.PathEscape(b.startHTML))
 	} else {
 		b.w.Navigate(urlStr)
 	}
+	b.benchLog("w.Navigate called")
+	// Inject nav bar on every navigation (guard in JS prevents duplicates)
+	go func() {
+		time.Sleep(800 * time.Millisecond)
+		b.w.Dispatch(func() {
+			b.benchLog("navBarJS eval start")
+			b.w.Eval(navBarJS)
+			b.benchLog("navBarJS eval done")
+		})
+	}()
 }
 
 func (b *browser) navigate(rawURL string) {
+	b.bench = nil
+	b.benchLog("navigate")
 	u := normalizeURL(rawURL)
 	urlStr := u.String()
+	log.Printf("[NAV] Navigate: %s", urlStr)
 	b.mu.Lock()
 	if b.curr == urlStr {
 		b.mu.Unlock()
@@ -1035,7 +1149,12 @@ func (b *browser) navigate(rawURL string) {
 		b.history = b.history[:b.idx+1]
 	}
 	b.history = append(b.history, urlStr)
-	b.idx = len(b.history) - 1
+	if len(b.history) > 100 {
+		b.history = b.history[len(b.history)-100:]
+		b.idx = len(b.history) - 1
+	} else {
+		b.idx = len(b.history) - 1
+	}
 	b.curr = urlStr
 	
 	// Track non-console URLs for resume
@@ -1053,27 +1172,34 @@ func (b *browser) navigate(rawURL string) {
 }
 
 func (b *browser) goBack() {
+	b.bench = nil
+	b.benchLog("goBack")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.idx > 0 {
 		b.idx--
 		b.curr = b.history[b.idx]
+		log.Printf("[NAV] Back: idx=%d url=%s", b.idx, b.curr)
 		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
 
 func (b *browser) goForward() {
+	b.bench = nil
+	b.benchLog("goForward")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.idx < len(b.history)-1 {
 		b.idx++
 		b.curr = b.history[b.idx]
+		log.Printf("[NAV] Forward: idx=%d url=%s", b.idx, b.curr)
 		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
 
 func (b *browser) reload() {
 	if b.curr != "" {
+		log.Printf("[NAV] Reload: %s", b.curr)
 		b.w.Dispatch(func() { navTo(b, b.curr) })
 	}
 }
@@ -1172,4 +1298,31 @@ func normalizeURL(raw string) *url.URL {
 		return &url.URL{Scheme: "https", Host: "google.com", RawQuery: "q=" + url.QueryEscape(raw)}
 	}
 	return u
+}
+
+func (b *browser) lazyStartEngines() {
+	time.Sleep(2 * time.Second)
+	if b.opt == nil {
+		return
+	}
+	engines := []func(){
+		b.opt.qse.Start,
+		b.opt.dna.Start,
+		b.opt.hbm.Start,
+		b.opt.avp.Start,
+		b.opt.domCompress.Start,
+		b.opt.ncg.Start,
+		b.opt.pce.Start,
+		b.opt.upm.Start,
+		b.opt.dra.Start,
+		b.opt.mcs.Start,
+		b.opt.cbl.Start,
+		b.opt.uee.Start,
+		b.opt.hfs.Start,
+		b.opt.rcm.Start,
+		b.opt.autotune.Start,
+	}
+	for _, fn := range engines {
+		go fn()
+	}
 }

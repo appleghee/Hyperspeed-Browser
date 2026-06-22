@@ -22,7 +22,8 @@ var nd=mu.removedNodes[n];
 if(nd.nodeType===1)T._drop(nd)}
 }}});
 T.mo.observe(document.documentElement,{childList:true,subtree:true});
-T._ticker=setInterval(function(){if(T.enabled)T._classify();},2000);
+setTimeout(function(){try{T.mo.disconnect()}catch(e){}},30000);
+T._ticker=setInterval(function(){if(T.enabled)T._classify();},5000);
 document.documentElement.dataset.mbIoc='1';
 },
 _add:function(n){

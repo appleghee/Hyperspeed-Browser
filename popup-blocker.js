@@ -80,6 +80,7 @@
   const originalWindowOpen = window.open;
   const popupQueue = [];
   window.__mbSPBQueue = popupQueue;
+  function capQueue() { while(popupQueue.length > 50) popupQueue.shift() }
 
   // ========== Thông báo UI ==========
   let notificationContainer = null;
@@ -221,7 +222,7 @@
       if (matchDomain(td, cfg.blacklist[i])) {
         cfg.blockedCount++;
         saveConfig(cfg);
-        popupQueue.push({
+        capQueue();popupQueue.push({
           id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
           url, target, features, targetDomain: td, currentDomain: cd, timestamp: Date.now()
         });
@@ -246,7 +247,7 @@
     if (cfg.autoBlockAds && isAdsUrl(url)) {
       cfg.blockedCount++;
       saveConfig(cfg);
-      popupQueue.push({
+      capQueue();popupQueue.push({
         id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         url, target, features, targetDomain: td, currentDomain: cd, timestamp: Date.now()
       });
@@ -258,7 +259,7 @@
     if (cfg.blockAllPopups) {
       cfg.blockedCount++;
       saveConfig(cfg);
-      popupQueue.push({
+      capQueue();popupQueue.push({
         id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
         url, target, features, targetDomain: td, currentDomain: cd, timestamp: Date.now()
       });

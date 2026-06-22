@@ -31,6 +31,7 @@ type UHEngine struct {
 	stopCh     chan struct{}
 	stats      UHEStats
 	hlrc       *HLRC
+	maxEntries int
 }
 
 type UHEStats struct {
@@ -63,6 +64,7 @@ func NewUHEngine() *UHEngine {
 		coolThresh: 0.15,
 		hotThresh:  0.6,
 		enabled:    true,
+		maxEntries: 5000,
 	}
 }
 
@@ -99,12 +101,19 @@ func (u *UHEngine) SetEnabled(v bool) {
 }
 
 func (u *UHEngine) loop() {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	cleanupTicker := time.NewTicker(5 * time.Minute)
+	defer cleanupTicker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			u.decayAll()
+		case <-cleanupTicker.C:
+			removed := u.RemoveStale(30 * time.Minute)
+			if removed > 0 {
+				fmt.Printf("[UHE] Removed %d stale entries (total: %d)\n", removed, len(u.entries))
+			}
 		case <-u.stopCh:
 			return
 		}
@@ -128,6 +137,9 @@ func (u *UHEngine) decayAll() {
 func (u *UHEngine) Access(key, kind string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
+	if len(u.entries) >= u.maxEntries {
+		u.evictColdest(100)
+	}
 	e, ok := u.entries[key]
 	if !ok {
 		e = &HeatEntry{
@@ -205,6 +217,45 @@ func (u *UHEngine) TopN(n int) []HeatEntry {
 		out[i] = *sorted[i]
 	}
 	return out
+}
+
+func (u *UHEngine) evictColdest(n int) {
+	var keys []string
+	now := time.Now()
+	for k, e := range u.entries {
+		if now.Sub(e.LastAccess) > 10*time.Minute && e.Heat < u.coolThresh {
+			keys = append(keys, k)
+			if len(keys) >= n {
+				break
+			}
+		}
+	}
+	if len(keys) < n {
+		// Fallback: evict oldest entries regardless of heat
+		oldest := make([]string, 0)
+		for k, e := range u.entries {
+			if len(oldest) < n {
+				oldest = append(oldest, k)
+			} else {
+				// Simple replacement: scan again for older
+				for i, ok := range oldest {
+					if e.LastAccess.Before(u.entries[ok].LastAccess) {
+						oldest[i] = k
+						break
+					}
+				}
+			}
+		}
+		for _, k := range oldest {
+			if len(keys) >= n {
+				break
+			}
+			keys = append(keys, k)
+		}
+	}
+	for _, k := range keys {
+		delete(u.entries, k)
+	}
 }
 
 func (u *UHEngine) Gather() *UHEStats {

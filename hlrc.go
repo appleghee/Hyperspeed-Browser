@@ -93,6 +93,9 @@ type HLRC struct {
 	// Hysteresis map — object keys with demotion timestamps
 	hysteresis map[string]time.Time
 
+	// Hard safety cap to prevent OOM
+	maxObjects int
+
 	stats HLRCStats
 }
 
@@ -114,10 +117,11 @@ func NewHLRC() *HLRC {
 		enabled:    true,
 		objects:    make(map[string]*RTObject),
 		heatScale:  255.0,
-		tickRate:   2 * time.Second,
-		ramBudgetMB: 256,
+		tickRate:   10 * time.Second,
+		ramBudgetMB: 50,
 		cpuBudgetPct: 80,
 		hysteresis: make(map[string]time.Time),
+		maxObjects: 2000,
 	}
 	for i := 0; i <= HLRCHeatMax; i++ {
 		h.buckets[i] = make(map[string]int)
@@ -153,6 +157,7 @@ func (h *HLRC) loop() {
 			h.tick++
 			h.decayAll()
 			h.enforceBudgets()
+			h.cleanHysteresis()
 		case <-h.stopCh:
 			return
 		}
@@ -186,6 +191,10 @@ func (h *HLRC) Register(key, kind string, restoreCost uint32) *RTObject {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	if len(h.objects) >= h.maxObjects {
+		h.evictColdest(50)
+	}
+
 	obj := &RTObject{
 		Heat:        0,
 		LODLevel:    HLRCLODFull,
@@ -196,10 +205,47 @@ func (h *HLRC) Register(key, kind string, restoreCost uint32) *RTObject {
 		createdAt:   time.Now(),
 		reuseProb:   0.5,
 		interactProb: 0.5,
+		ramCost:   int64(restoreCost),
+	}
+	if obj.ramCost < 100 {
+		obj.ramCost = 100
 	}
 	h.objects[key] = obj
 	h.buckets[0][key] = 1
 	return obj
+}
+
+// evictColdest removes N coldest entries when object cap is hit
+func (h *HLRC) evictColdest(n int) {
+	if n < 1 {
+		n = 1
+	}
+	var coldest []string
+	for heat := uint8(0); heat <= HLRCHeatMax && len(coldest) < n; heat++ {
+		for key := range h.buckets[heat] {
+			coldest = append(coldest, key)
+			if len(coldest) >= n {
+				break
+			}
+		}
+	}
+	for _, key := range coldest {
+		if obj, ok := h.objects[key]; ok {
+			delete(h.buckets[obj.Heat], key)
+			delete(h.objects, key)
+			delete(h.hysteresis, key)
+		}
+	}
+}
+
+// cleanHysteresis removes hysteresis entries older than 60s
+func (h *HLRC) cleanHysteresis() {
+	cutoff := time.Now().Add(-60 * time.Second)
+	for key, t := range h.hysteresis {
+		if t.Before(cutoff) {
+			delete(h.hysteresis, key)
+		}
+	}
 }
 
 // Access boosts an object's heat

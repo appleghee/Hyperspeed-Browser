@@ -73,6 +73,18 @@ func (d *DNAEngine) Start() {
 	// DNA runs on-demand via Fingerprint() — no persistent JS needed
 }
 
+func (d *DNAEngine) evictOldestDNA() {
+	var oldest string
+	var oldestTime time.Time
+	for domain, p := range d.fingerprints {
+		if oldest == "" || p.LastSeen.Before(oldestTime) {
+			oldest = domain
+			oldestTime = p.LastSeen
+		}
+	}
+	delete(d.fingerprints, oldest)
+}
+
 func (d *DNAEngine) Fingerprint() (*PageDNA, error) {
 	var dna PageDNA
 	if err := d.b.syncUnwrapInto(dnaGatherJS, 10*time.Second, &dna); err != nil {
@@ -80,6 +92,9 @@ func (d *DNAEngine) Fingerprint() (*PageDNA, error) {
 	}
 	dna.LastSeen = time.Now()
 	d.mu.Lock()
+	if len(d.fingerprints) >= 500 {
+		d.evictOldestDNA()
+	}
 	d.fingerprints[dna.Domain] = &dna
 	d.stats = DNAStats{
 		Profiled:  len(d.fingerprints),

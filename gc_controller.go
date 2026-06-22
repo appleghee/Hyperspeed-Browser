@@ -76,7 +76,7 @@ func (agc *AdaptiveGCController) Stop() {
 }
 
 func (agc *AdaptiveGCController) monitorLoop() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	
 	for {
@@ -137,7 +137,7 @@ func (agc *AdaptiveGCController) evaluate() {
 		agc.lastGCPercent = newGCPercent
 		agc.lastSetTime = time.Now()
 		
-		if agc.samples%3 == 0 {
+		if agc.samples%15 == 0 {
 			fmt.Printf("[AdaptiveGC] heap=%dMB growth=%.2f%% GCPercent=%d\n",
 				agc.smoothedHeap/(1024*1024), growthRate*100, newGCPercent)
 		}

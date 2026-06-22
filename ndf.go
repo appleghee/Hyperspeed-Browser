@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"io"
@@ -56,11 +57,14 @@ func (n *NDFCache) Fetch(url string, onData func([]byte, bool) error) (*NDFEntry
 	}
 
 	// Fetch from remote
-	req, _ := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	for k, v := range headers {
 		req.Header[k] = v
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		if cached != nil {
 			n.mu.Lock()

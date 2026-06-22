@@ -14,6 +14,7 @@ type NCGEngine struct {
 	enabled bool
 	stats   NCGStats
 	costs   map[string]*NCGEntry
+	maxDomains int
 }
 
 type NCGEntry struct {
@@ -33,7 +34,7 @@ type NCGStats struct {
 }
 
 func NewNCGEngine(b *browser) *NCGEngine {
-	return &NCGEngine{b: b, enabled: true, costs: make(map[string]*NCGEntry)}
+	return &NCGEngine{b: b, enabled: true, costs: make(map[string]*NCGEntry), maxDomains: 500}
 }
 
 func (n *NCGEngine) Start() {}
@@ -43,6 +44,9 @@ func (n *NCGEngine) Track(domain string, size int64, latency time.Duration) {
 	defer n.mu.Unlock()
 	e, ok := n.costs[domain]
 	if !ok {
+		if len(n.costs) >= n.maxDomains {
+			n.evictOldest()
+		}
 		e = &NCGEntry{Domain: domain}
 		n.costs[domain] = e
 	}
@@ -50,6 +54,22 @@ func (n *NCGEngine) Track(domain string, size int64, latency time.Duration) {
 	e.Requests++
 	e.AvgLatency = (e.AvgLatency*time.Duration(e.Requests-1) + latency) / time.Duration(e.Requests)
 	e.LastSeen = time.Now()
+}
+
+func (n *NCGEngine) evictOldest() {
+	var oldest string
+	var oldestTime time.Time
+	first := true
+	for k, e := range n.costs {
+		if first || e.LastSeen.Before(oldestTime) {
+			oldest = k
+			oldestTime = e.LastSeen
+			first = false
+		}
+	}
+	if oldest != "" {
+		delete(n.costs, oldest)
+	}
 }
 
 func (n *NCGEngine) Stats() NCGStats {

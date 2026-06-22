@@ -352,7 +352,7 @@ type MetricsCollector struct {
 }
 
 func (mc *MetricsCollector) Collect() (*PageMetrics, error) {
-	val, err := mc.b.syncUnwrap(metricsCollectJS, 10*time.Second)
+	raw, err := mc.b.syncUnwrap(metricsCollectJS, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -361,12 +361,11 @@ func (mc *MetricsCollector) Collect() (*PageMetrics, error) {
 		url = fmt.Sprint(u)
 	}
 	var pm PageMetrics
-	switch v := val.(type) {
-	case map[string]interface{}:
-		b, _ := json.Marshal(v)
+	if s, ok := raw.(string); ok {
+		json.Unmarshal([]byte(s), &pm)
+	} else if m, ok := raw.(map[string]interface{}); ok {
+		b, _ := json.Marshal(m)
 		json.Unmarshal(b, &pm)
-	case string:
-		json.Unmarshal([]byte(v), &pm)
 	}
 	pm.URL = url
 	pm.CollectedAt = time.Now().UTC().Format(time.RFC3339)

@@ -17,6 +17,7 @@ type HBMEngine struct {
 	stats   HBMStats
 	hotPool int64
 	coolPool int64
+	stopCh  chan struct{}
 }
 
 type HBMStats struct {
@@ -34,36 +35,51 @@ func NewHBMEngine() *HBMEngine {
 func (h *HBMEngine) Start() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if !h.enabled {
+	if !h.enabled || h.stopCh != nil {
 		return
 	}
+	h.stopCh = make(chan struct{})
 	go h.loop()
 }
 
+func (h *HBMEngine) Stop() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.stopCh != nil {
+		close(h.stopCh)
+		h.stopCh = nil
+	}
+}
+
 func (h *HBMEngine) loop() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		hot := int64(m.Alloc) * 60 / 100
-		cool := int64(m.Alloc) * 40 / 100
-		h.mu.Lock()
-		h.hotPool = hot / (1024 * 1024)
-		h.coolPool = cool / (1024 * 1024)
-		ratio := float64(0)
-		if h.hotPool+h.coolPool > 0 {
-			ratio = float64(h.hotPool) * 100 / float64(h.hotPool+h.coolPool)
+	for {
+		select {
+		case <-ticker.C:
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			hot := int64(m.Alloc) * 60 / 100
+			cool := int64(m.Alloc) * 40 / 100
+			h.mu.Lock()
+			h.hotPool = hot / (1024 * 1024)
+			h.coolPool = cool / (1024 * 1024)
+			ratio := float64(0)
+			if h.hotPool+h.coolPool > 0 {
+				ratio = float64(h.hotPool) * 100 / float64(h.hotPool+h.coolPool)
+			}
+			gc := debug.SetGCPercent(-1)
+			h.stats = HBMStats{
+				HotAllocMB:  h.hotPool,
+				CoolAllocMB: h.coolPool,
+				GCPercent:   gc,
+				HotRatio:    fmt.Sprintf("%.0f%%", ratio),
+				Status:      "active",
+			}
+			h.mu.Unlock()
+		case <-h.stopCh:
+			return
 		}
-		gc := debug.SetGCPercent(-1)
-		h.stats = HBMStats{
-			HotAllocMB:  h.hotPool,
-			CoolAllocMB: h.coolPool,
-			GCPercent:   gc,
-			HotRatio:    fmt.Sprintf("%.0f%%", ratio),
-			Status:      "active",
-		}
-		h.mu.Unlock()
 	}
 }
 
