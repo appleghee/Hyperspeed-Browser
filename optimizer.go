@@ -18,7 +18,8 @@ import (
 // =============================================================================
 
 type Optimizer struct {
-	b *browser
+	b     *browser
+	adapt *Adapt
 
 	mu      sync.RWMutex
 	enabled bool
@@ -191,6 +192,7 @@ var mobileProfile = OptimizerProfile{
 
 func NewOptimizer(b *browser) *Optimizer {
 	o := &Optimizer{
+		adapt: newAdapt(),
 		b:          b,
 		enabled:    true,
 		profile:    defaultProfile,
@@ -231,8 +233,11 @@ func NewOptimizer(b *browser) *Optimizer {
 		rcm:        NewRCMEngine(b),
 	}
 	o.uhe.SetHLRC(o.hlrc)
+	o.uhe.SetOptRef(o)
 	o.ndf.SetHLRC(o.hlrc)
 	o.cache.SetHLRC(o.hlrc)
+	o.hlrc.SetOptRef(o)
+	o.autotune.SetOptRef(o)
 	o.netq.maxConcurrent = defaultProfile.NetworkMaxConcurrent
 	o.autotune.Start()
 	o.gcctl.Start()
@@ -272,6 +277,14 @@ func (o *Optimizer) IsEnabled() bool {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	return o.enabled
+}
+
+// ShouldRun returns true if the given engine should execute for the current page.
+func (o *Optimizer) ShouldRun(engine string) bool {
+	if o.adapt == nil || !o.enabled {
+		return true
+	}
+	return o.adapt.ShouldRun(engine)
 }
 
 func (o *Optimizer) SetEnabled(v bool) {

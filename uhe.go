@@ -32,6 +32,7 @@ type UHEngine struct {
 	stats      UHEStats
 	hlrc       *HLRC
 	maxEntries int
+	optRef     *Optimizer
 }
 
 type UHEStats struct {
@@ -69,6 +70,7 @@ func NewUHEngine() *UHEngine {
 }
 
 func (u *UHEngine) SetHLRC(h *HLRC) { u.hlrc = h }
+func (u *UHEngine) SetOptRef(o *Optimizer) { u.optRef = o }
 
 func (u *UHEngine) Start() {
 	u.mu.Lock()
@@ -108,6 +110,9 @@ func (u *UHEngine) loop() {
 	for {
 		select {
 		case <-ticker.C:
+			if u.optRef != nil && !u.optRef.ShouldRun("uhe") {
+				continue
+			}
 			u.decayAll()
 		case <-cleanupTicker.C:
 			removed := u.RemoveStale(30 * time.Minute)

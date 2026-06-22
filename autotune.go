@@ -14,6 +14,7 @@ type AutoTuneUHE struct {
 	profilesByDomain map[string]*SiteProfile
 	globalProfile   *SiteProfile
 	stopCh          chan struct{}
+	optRef          *Optimizer
 }
 
 type SiteProfile struct {
@@ -64,12 +65,17 @@ func (a *AutoTuneUHE) tuneLoop() {
 	for {
 		select {
 		case <-ticker.C:
+			if a.optRef != nil && !a.optRef.ShouldRun("autotune") {
+				continue
+			}
 			a.analyze()
 		case <-a.stopCh:
 			return
 		}
 	}
 }
+
+func (a *AutoTuneUHE) SetOptRef(o *Optimizer) { a.optRef = o }
 
 func (a *AutoTuneUHE) RecordMetrics(domain string, cpu, mem, net float64) {
 	a.mu.Lock()

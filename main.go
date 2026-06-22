@@ -541,6 +541,9 @@ func (b *browser) startAPI(ready chan<- struct{}) {
 	// GC Controller endpoints
 	mux.HandleFunc("/api/gc/stats", b.handleGCStats)
 
+	// Adapt engine orchestration
+	mux.HandleFunc("/api/adapt/stats", b.handleAdaptStats)
+
 	// v3.2.0 Genesis engine endpoints
 	mux.HandleFunc("/api/dna/fingerprint", b.handleDNAFingerprint)
 	mux.HandleFunc("/api/dna/stats", b.handleDNAStats)
@@ -1167,6 +1170,11 @@ func (b *browser) navigate(rawURL string) {
 			}
 		}
 	}
+	// Adapt: classify site and disable unnecessary engines
+	if b.opt != nil && b.opt.adapt != nil {
+		b.opt.adapt.OnNavigate(urlStr)
+	}
+
 	b.mu.Unlock()
 	b.w.Dispatch(func() { navTo(b, urlStr) })
 }

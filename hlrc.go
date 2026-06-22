@@ -72,6 +72,8 @@ type HLRC struct {
 	mu      sync.RWMutex
 	enabled bool
 
+	optRef *Optimizer
+
 	// 256 bucket queue indexed by heat
 	buckets [HLRCHeatMax + 1]map[string]int
 
@@ -129,6 +131,8 @@ func NewHLRC() *HLRC {
 	return h
 }
 
+func (h *HLRC) SetOptRef(o *Optimizer) { h.optRef = o }
+
 func (h *HLRC) Start() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -154,6 +158,9 @@ func (h *HLRC) loop() {
 	for {
 		select {
 		case <-ticker.C:
+			if h.optRef != nil && !h.optRef.ShouldRun("hlrc") {
+				continue
+			}
 			h.tick++
 			h.decayAll()
 			h.enforceBudgets()
