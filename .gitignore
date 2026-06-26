@@ -1,0 +1,7 @@
+*.exe
+*.test
+*.out
+bridge/
+__debug_bin
+*.log
+AGENTS.md
